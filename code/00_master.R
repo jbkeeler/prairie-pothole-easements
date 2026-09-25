@@ -2,6 +2,7 @@
 # Rscript code/00_master.R
 
 library(data.table)
+library(arrow)
 library(kableExtra)
 library(rnassqs)
 library(sf)
