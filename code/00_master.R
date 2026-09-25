@@ -1,6 +1,21 @@
 # Entry point: run this to reproduce the full pipeline in order.
 # Rscript code/00_master.R
 
+library(data.table)
+library(kableExtra)
+library(rnassqs)
+library(sf)
+library(terra)
+library(tigris)
+library(ggplot2)
+library(colorspace)
+library(scales)
+library(ggthemes)
+library(Cairo)
+
+
+
+
 source("code/constants.R")
 source("code/utils.R")
 
