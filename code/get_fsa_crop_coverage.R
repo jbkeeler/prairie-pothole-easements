@@ -79,22 +79,16 @@ stutsman <- counties(state = "ND", year = 2022)
 stutsman <- stutsman[stutsman$COUNTYFP == "093",] |>
   st_transform(5070)
 
-stutsman_farms <- st_intersection(fsa_clu_nd_geometry, stutsman)
-stutsman_farms <- sf::st_drop_geometry(stutsman_farms)  # returns a plain data.frame
-setDT(stutsman_farms)
+# Keep the spatial work in sf and the tabular work in data.table; only pass IDs between them
+clu_ids_2022 <- unique(
+  farm_panel_nd[program_year == 2022 & !is.na(clu_identifier), clu_identifier]
+)
 
-stutsman_farms <- merge(stutsman_farms,farm_panel_nd,by=c("clu_identifier"))
+stutsman_ease <- st_filter(easements_nd, stutsman)
+stutsman_ease <- stutsman_ease[stutsman_ease$clu_identifier %in% clu_ids_2022, ]
 
-stutsman_farms <- stutsman_farms[program_year == 2022]
-
-cols <- c("clu_identifier")
-stutsman_farms <- stutsman_farms[, ..cols]
-
-check <- merge(stutsman_farms,easements_nd,by=c("clu_identifier"))
-
-check <- st_as_sf(check)
-
-plot(check$geometry)
+plot(st_geometry(stutsman), border = "grey40")
+plot(st_geometry(stutsman_ease), col = "darkgreen", border = NA, add = TRUE)
 
 # from khashi
 # NIW diff
