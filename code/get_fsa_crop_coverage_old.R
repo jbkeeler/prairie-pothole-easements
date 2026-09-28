@@ -65,8 +65,28 @@ easements_nd_dt <- st_drop_geometry(easements_nd)
 fsa_clu <- merge(easements_nd_dt,fsa_clu_nd_attributes,by =c("clu_identifier"))
 setDT(fsa_clu)
 
+
+
+stutsman_fn <- unique(
+  fsa_clu[county_code == "093",.(farm_number,state_code,county_code)]
+)
+
+stutsman_fn$farm_number <- sprintf("%07d", as.integer(stutsman_fn$farm_number))
+
+setnames(stutsman_fn,c("state_code","county_code"),c("state_fsa_code","county_fsa_code"))
+
+
+check <- farm_panel_nd[county_fsa_code == "093"]
+
+stutsman_ease_data <- farm_panel_nd[
+  stutsman_fn,
+  on = .(farm_number, state_fsa_code, county_fsa_code),
+  nomatch = NULL
+]
+
+
 stutsman_clu <- unique(
-  fsa_clu[fsa_clu$county_ansi_code == "093",]$clu_identifier
+  stutsman_ease_data[!is.na(clu_identifier),.(clu_identifier,farm_number,state_fsa_code,county_fsa_code)]
 )
 
 
@@ -78,9 +98,9 @@ plot(st_geometry(stutsman), border = "grey40")
 plot(st_geometry(stutsman_ease), col = "darkgreen", border = NA, add = TRUE)
 
 
-stutsman_fn <- unique(
-  fsa_clu[,.(farm_number,state_code,county_code)]
-)
-
-
-stutsman_ease_data <- farm_panel_nd[clu_identifier %in% stutsman_clu]
+# cols <- c("farm_number", "state_fsa_code", "county_fsa_code", "program_year", 
+#           "base_acres_2023", "total_reported_acres")
+# 
+# 
+# farm_panel_nd <- unique(
+#   farm_panel_nd[, ..cols])
