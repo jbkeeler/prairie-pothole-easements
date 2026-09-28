@@ -18,20 +18,6 @@ fsa_clu_nd_attributes <- as.data.table(
 )
 
 
-fws_tracts_nd <- readRDS("data/processed/fws_tracts_nd.rds") |>
-  st_transform(5070)
-
-easements_nd <- st_intersection(fsa_clu_nd_geometry,fws_tracts_nd)
-
-easements_nd <- merge(easements_nd,fsa_clu_nd_attributes,by =c("clu_identifier"))
-
-
-easements_nd$acres <- as.numeric(st_area(easements_nd)) / 4046.8564224
-
-# Dissolve before measuring so overlapping tracts aren't double counted
-easement_acres_total <- as.numeric(st_area(st_union(easements_nd))) / 4046.8564224
-easement_acres_sum <- sum(easements_nd$acres)
-
 acreage_by_crop_nd <- as.data.table(
   read_parquet("D:/data/processed/FSA/panel/acreage_by_crop/ND/part-0.parquet")
 )
@@ -62,33 +48,39 @@ farm_panel_nd <- merge(farm_panel_nd,acreage_by_crop_nd,by=c("farm_number", "sta
 
 # farm_panel_nd <- merge(farm_panel_nd,easements_nd,by=c("clu_identifier","farm_number"))
 
-easement_acres_sum <- sum(easements_nd$acres)
-
-stutsman_farms <- farm_panel_nd[farm_panel_nd$county_fsa_code == "093",]
-
-stutsman_farms <- stutsman_farms[!is.na(stutsman_farms$clu_identifier)]
-
-stutsman_farms_ease <- stutsman_farms[!is.na(stutsman_farms$INTTYPE2)]
-
-check <- merge(stutsman_farms,easements_nd,by=c("clu_identifier"))
-
-
 
 
 stutsman <- counties(state = "ND", year = 2022)
 stutsman <- stutsman[stutsman$COUNTYFP == "093",] |>
   st_transform(5070)
 
-# Keep the spatial work in sf and the tabular work in data.table; only pass IDs between them
-clu_ids_2022 <- unique(
-  farm_panel_nd[program_year == 2022 & !is.na(clu_identifier), clu_identifier]
+
+fws_tracts_nd <- readRDS("data/processed/fws_tracts_nd.rds") |>
+  st_transform(5070)
+
+easements_nd <- st_intersection(fsa_clu_nd_geometry,fws_tracts_nd)
+
+easements_nd_dt <- st_drop_geometry(easements_nd)
+
+fsa_clu <- merge(easements_nd_dt,fsa_clu_nd_attributes,by =c("clu_identifier"))
+setDT(fsa_clu)
+
+stutsman_clu <- unique(
+  fsa_clu[fsa_clu$county_ansi_code == "093",]$clu_identifier
 )
 
+
 stutsman_ease <- st_filter(easements_nd, stutsman)
-stutsman_ease <- stutsman_ease[stutsman_ease$clu_identifier %in% clu_ids_2022, ]
+stutsman_ease <- stutsman_ease[stutsman_ease$clu_identifier %in% stutsman_clu, ]
+
 
 plot(st_geometry(stutsman), border = "grey40")
 plot(st_geometry(stutsman_ease), col = "darkgreen", border = NA, add = TRUE)
 
-# from khashi
-# NIW diff
+
+stutsman_fn <- unique(
+  fsa_clu[,.(farm_number,state_code,county_code)]
+)
+
+
+stutsman_ease_data <- farm_panel_nd[clu_identifier %in% stutsman_clu]
