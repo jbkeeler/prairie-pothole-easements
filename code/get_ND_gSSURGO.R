@@ -24,7 +24,9 @@ levels(mu_r) <- NULL   # drop the attribute table so values are plain MUKEY inte
 # map-unit-level soil summaries (one row per mukey)
 valu1    <- st_read(gssurgo_gdb, "Valu1",    quiet = TRUE) |> as.data.table()
 muaggatt <- st_read(gssurgo_gdb, "muaggatt", quiet = TRUE) |> as.data.table()
+mapunit  <- st_read(gssurgo_gdb, "mapunit",  quiet = TRUE) |> as.data.table()
 valu1[, mukey := as.integer(mukey)]
+mapunit[, mukey := as.integer(mukey)]
 muaggatt[, `:=`(
   mukey = as.integer(mukey), 
   hydclprs = as.numeric(hydclprs) # hydclprs is stored as text
@@ -35,15 +37,22 @@ fws_tracts_nd$tract_uid <- seq_len(nrow(fws_tracts_nd))
 # GISACRES is 0 for every tract, so use polygon area
 fws_tracts_nd$poly_acres <- as.numeric(st_area(fws_tracts_nd)) / 4046.8564224
 
+# NWI wetland x tract polygons from get_easement_NWI.R (same tract_uid)
+nwi_ease <- readRDS("data/processed/nwi_tracts_nd.rds")
+
 mu_r    <- crop(mu_r, vect(fws_tracts_nd))
 tract_r <- rasterize(vect(fws_tracts_nd), mu_r, field = "tract_uid")
+# 1 = NWI wetland, 0 = non-wetland; cells assigned by center, so wetlands < 1 cell can drop out
+wet_r   <- rasterize(vect(nwi_ease), mu_r, field = 1, background = 0)
 
-# pixel counts for each tract x mukey pair (NA/masked cells dropped)
-tract_mu <- crosstab(c(tract_r, mu_r), long = TRUE, useNA = FALSE) |> as.data.table()
-setnames(tract_mu, c("tract_uid", "mukey", "n_pix"))
+# pixel counts for each tract x wetland x mukey combination (NA/masked cells dropped)
+tract_mu_wet <- crosstab(c(tract_r, wet_r, mu_r), long = TRUE, useNA = FALSE) |> as.data.table()
+setnames(tract_mu_wet, c("tract_uid", "wetland", "mukey", "n_pix"))
 
 # 10 m x 10 m cell -> acres
-tract_mu[, acres := n_pix * prod(res(mu_r)) / 4046.8564224]   # ~0.0247 ac
+tract_mu_wet[, acres := n_pix * prod(res(mu_r)) / 4046.8564224]   # ~0.0247 ac
+
+tract_mu <- tract_mu_wet[, .(n_pix = sum(n_pix), acres = sum(acres)), by = .(tract_uid, mukey)]
 
 tract_mu <- merge(tract_mu,
                   valu1[, .(mukey, nccpi3all, aws0_100, soc0_100, rootznemc, droughty)],
@@ -70,11 +79,39 @@ tract_soils <- merge(tract_soils,
                      as.data.table(st_drop_geometry(fws_tracts_nd))[, .(tract_uid, TRACTNO, poly_acres)],
                      by = "tract_uid")
 
+# dominant map unit: the mukey with the most acres in each tract, with its symbol and name;
+# columns are prefixed, e.g. dom_musym, wet_dom_musym
+dominant_mu <- function(dt, prefix) {
+  dom <- dt[dt[, .I[which.max(acres)], by = tract_uid]$V1, .(tract_uid, mukey, mu_acres = acres)]
+  dom <- merge(dom, mapunit[, .(mukey, musym, muname)], by = "mukey", all.x = TRUE)
+  cols <- c("mukey", "mu_acres", "musym", "muname")
+  setnames(dom, cols, paste0(prefix, cols))
+  dom
+}
+
+tract_soils <- merge(tract_soils, dominant_mu(tract_mu, "dom_"), by = "tract_uid", all.x = TRUE)
+
+# wetland vs non-wetland parts of each tract; tracts without NWI wetlands get wet_acres = 0, NA wet_dom_*
+tract_wet_acres <- tract_mu_wet[, .(wet_acres    = sum(acres[wetland == 1]),
+                                    nonwet_acres = sum(acres[wetland == 0])), by = tract_uid]
+tract_soils <- merge(tract_soils, tract_wet_acres, by = "tract_uid", all.x = TRUE)
+tract_soils <- merge(tract_soils, dominant_mu(tract_mu_wet[wetland == 1], "wet_dom_"),
+                     by = "tract_uid", all.x = TRUE)
+tract_soils <- merge(tract_soils, dominant_mu(tract_mu_wet[wetland == 0], "nonwet_dom_"),
+                     by = "tract_uid", all.x = TRUE)
+
 # categorical attributes: acres by class, e.g. land capability class
 tract_lcc <- tract_mu[, .(acres = sum(acres)), by = .(tract_uid, niccdcd)]
 
 saveRDS(tract_soils, "data/processed/gssurgo_tract_soils_nd.rds")
 saveRDS(tract_lcc,   "data/processed/gssurgo_tract_lcc_nd.rds")
+
+
+write.csv(tract_soils[, .(tract_uid, dom_mukey, dom_mu_acres, dom_musym, dom_muname,
+                          wet_acres, wet_dom_mukey, wet_dom_mu_acres, wet_dom_musym, wet_dom_muname,
+                          nonwet_acres, nonwet_dom_mukey, nonwet_dom_mu_acres, nonwet_dom_musym, nonwet_dom_muname)],
+          "data/processed/gssurgo_tract_dom_soils_nd.csv", row.names = FALSE)
+
 
 
 stutsman <- nd_cnties[nd_cnties$COUNTYFP == "093",] |>
@@ -107,3 +144,14 @@ p_hydric <- ggplot() +
 
 ggsave("figures/stutsman_easement_hydric.pdf", p_hydric,
        width = 7, height = 6.5, device = cairo_pdf)
+
+
+# nass tiling acreage by county
+# paper on tile drainage using satellite data
+
+
+# pick the soil type that is more than 50%
+
+
+# find common map unit
+# get NWI wetlands

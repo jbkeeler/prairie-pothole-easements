@@ -114,3 +114,44 @@ p_cdl <- ggplot() +
 
 ggsave("figures/stutsman_easement_cdl.pdf", p_cdl,
        width = 7, height = 6.5, device = cairo_pdf, bg = "white")
+
+
+nassqs_auth(key = Sys.getenv("NASSQS_TOKEN"))
+
+# Parameters to query on and data call
+params <- list(
+  commodity_desc = "CORN", 
+  short_desc = "CORN, GRAIN - PRICE RECEIVED, MEASURED IN $ / BU",
+  agg_level_desc = "STATE",
+  state_fips_code = "38",
+  year = years
+  )
+
+cnty_pasture_rents <- nassqs(params) |>
+  as.data.table()
+
+cols <- c("state_fips_code","county_code","year","Value")
+
+cnty_pasture_rents <- cnty_pasture_rents[, ..cols]
+
+
+# What crops to include
+nd_cnties_tab <- readRDS("data/processed/cdl_county_acres_nd.rds")
+
+acres_nd <- nd_cnties_tab[, .(acres = sum(acres,na.rm=TRUE)), by = .(class_name,year)]
+
+setorder(acres_nd,-year,-acres)
+
+
+# yield loss adjacent to wetland
+# per acre returns
+# additional diesel cost from 
+
+# field boundaries - satellite derived - from usda
+
+# check whether easements and clus are the same
+
+# do water body analysis - feasibility
+
+# farmable impacts 
+# easement acres vs farmable

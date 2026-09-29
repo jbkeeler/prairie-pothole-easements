@@ -24,7 +24,9 @@ levels(mu_r) <- NULL   # drop the attribute table so values are plain MUKEY inte
 # map-unit-level soil summaries (one row per mukey)
 valu1    <- st_read(gssurgo_gdb, "Valu1",    quiet = TRUE) |> as.data.table()
 muaggatt <- st_read(gssurgo_gdb, "muaggatt", quiet = TRUE) |> as.data.table()
+mapunit  <- st_read(gssurgo_gdb, "mapunit",  quiet = TRUE) |> as.data.table()
 valu1[, mukey := as.integer(mukey)]
+mapunit[, mukey := as.integer(mukey)]
 muaggatt[, `:=`(
   mukey = as.integer(mukey), 
   hydclprs = as.numeric(hydclprs) # hydclprs is stored as text
@@ -70,6 +72,14 @@ tract_soils <- merge(tract_soils,
                      as.data.table(st_drop_geometry(fws_tracts_nd))[, .(tract_uid, TRACTNO, poly_acres)],
                      by = "tract_uid")
 
+# dominant map unit: the mukey with the most acres in each tract
+tract_dom_mu <- tract_mu[tract_mu[, .I[which.max(acres)], by = tract_uid]$V1,
+                         .(tract_uid, dom_mukey = mukey, dom_mu_acres = acres)]
+tract_dom_mu <- merge(tract_dom_mu,
+                      mapunit[, .(dom_mukey = mukey, dom_musym = musym, dom_muname = muname)],
+                      by = "dom_mukey", all.x = TRUE)
+tract_soils <- merge(tract_soils, tract_dom_mu, by = "tract_uid", all.x = TRUE)
+
 # categorical attributes: acres by class, e.g. land capability class
 tract_lcc <- tract_mu[, .(acres = sum(acres)), by = .(tract_uid, niccdcd)]
 
@@ -77,3 +87,4 @@ saveRDS(tract_soils, "data/processed/gssurgo_tract_soils_nd.rds")
 saveRDS(tract_lcc,   "data/processed/gssurgo_tract_lcc_nd.rds")
 
 
+write.csv(tract_soils[,.(tract_uid,dom_mukey,dom_mu_acres,dom_musym,dom_muname)], "data/processed/gssurgo_tract_dom_soils_nd.csv")
