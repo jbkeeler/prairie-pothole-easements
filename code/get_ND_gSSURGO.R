@@ -79,6 +79,13 @@ tract_soils <- merge(tract_soils,
                      as.data.table(st_drop_geometry(fws_tracts_nd))[, .(tract_uid, TRACTNO, poly_acres)],
                      by = "tract_uid")
 
+# county of each tract; tracts crossing a county line get the county with the most overlap
+tract_cnty <- st_join(fws_tracts_nd[, "tract_uid"], nd_cnties[, c("GEOID", "NAME")], largest = TRUE) |>
+  st_drop_geometry() |>
+  as.data.table()
+setnames(tract_cnty, c("GEOID", "NAME"), c("county_fips", "county_name"))
+tract_soils <- merge(tract_soils, tract_cnty, by = "tract_uid", all.x = TRUE)
+
 # dominant map unit: the mukey with the most acres in each tract, with its symbol and name;
 # columns are prefixed, e.g. dom_musym, wet_dom_musym
 dominant_mu <- function(dt, prefix) {
@@ -107,7 +114,7 @@ saveRDS(tract_soils, "data/processed/gssurgo_tract_soils_nd.rds")
 saveRDS(tract_lcc,   "data/processed/gssurgo_tract_lcc_nd.rds")
 
 
-write.csv(tract_soils[, .(tract_uid, dom_mukey, dom_mu_acres, dom_musym, dom_muname,
+write.csv(tract_soils[, .(tract_uid, county_fips, county_name, dom_mukey, dom_mu_acres, dom_musym, dom_muname,
                           wet_acres, wet_dom_mukey, wet_dom_mu_acres, wet_dom_musym, wet_dom_muname,
                           nonwet_acres, nonwet_dom_mukey, nonwet_dom_mu_acres, nonwet_dom_musym, nonwet_dom_muname)],
           "data/processed/gssurgo_tract_dom_soils_nd.csv", row.names = FALSE)
