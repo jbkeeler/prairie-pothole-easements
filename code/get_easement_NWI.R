@@ -34,6 +34,17 @@ nwi_ease$wet_acres <- as.numeric(st_area(nwi_ease)) / 4046.8564224
 saveRDS(nwi_ease, "data/processed/nwi_tracts_nd.rds")
 
 
+
+
+
+
+ease_buffers <- read.csv("data/processed/LateralEffect_Tract_LE.csv")
+
+
+
+
+
+
 stutsman <- nd_cnties[nd_cnties$COUNTYFP == "093",] |>
   st_transform(5070)
 
