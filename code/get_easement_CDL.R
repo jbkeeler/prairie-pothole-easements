@@ -510,16 +510,74 @@ unvalued_acres <- tract_buf_tab[!crop_revenue, on = .(class_name, COUNTYFP, year
 
 saveRDS(tract_buf_revenue, "data/processed/tract_buf_crop_revenue_nd.rds")
 
-# What crops to include
-nd_cnties_tab <- readRDS("data/processed/cdl_county_acres_nd.rds")
 
-acres_nd <- nd_cnties_tab[, .(acres = round(sum(acres,na.rm=TRUE))), by = .(class_name,year)]
+revenue_summary_crop_year <- tract_buf_revenue[, .(total_revenue = sum(total_revenue, na.rm = TRUE)),
+                                               by = .(class_name, year)][order(year, -total_revenue)]
+revenue_summary_year <- revenue_summary_crop_year[, .(class_name = "Total",
+                                                      total_revenue = sum(total_revenue)), by = year]
+revenue_summary_crop_year <- rbind(revenue_summary_crop_year, revenue_summary_year)[
+  order(year, class_name == "Total", -total_revenue)]
+revenue_summary_crop_year[, total_revenue_fmt := label_dollar()(total_revenue)]
 
-setorder(acres_nd,-year,-acres)
+# mean annual revenue by crop and total, 2021-2025 (crop absent in a year counts as $0)
+revenue_summary_crop_mean <- revenue_summary_crop_year[, .(mean_revenue = sum(total_revenue) / length(years)),
+                                                       by = class_name][
+  order(class_name == "Total", -mean_revenue)]
+revenue_summary_crop_mean[, mean_revenue_fmt := label_dollar()(mean_revenue)]
 
-# top 12 crops by acres in each year
-top_crops_nd <- acres_nd[, head(.SD, 12), by = year]
+revenue_summary_crop_mean <- revenue_summary_crop_mean[,.(class_name,mean_revenue_fmt)]
 
+# Planted acres were dropped on 2026-09-09 (not cited in the body, and the
+# loss column already carries scale), and the freed width went to the
+# remaining columns. The crop column is 2.3cm so "Grain Sorghum" stays on
+# one line, and the accounting loss-years column is 1.25cm so "No Loss" does
+# not wrap. Total width is 15.25cm + 11 x 2 x 3pt tabcolsep = 17.57cm, inside
+# the 17.78cm textwidth.
+spec1 <- paste("L{2.3cm}",
+               "C{1.1cm}")
+
+labs1 <- c("Crop",
+           "Mean Revenue Loss",)
+
+note1 <- paste0(
+  "Dollar columns sum losses and payments over the loss years only. ",
+  "All-year coverage counts payments from every year, including those with no ",
+  "loss, against the same loss total. No Loss marks a crop whose net revenue ",
+  "was positive in every year on that basis. The Total row treats the nine ",
+  "crops as one portfolio. ARC/PLC is modeled from program rules and scaled ",
+  "state by state to Farm Service Agency disbursements for 2019 to 2024."
+)
+
+save_latex_table_bands(
+  revenue_summary_crop_mean,
+  file_path = "./tables/revenue_summary_crop_mean.tex",
+  caption   = paste0("Mean Crop Revenue (2021 - 2025) for Acreage Within FWS Buffers"),
+  label     = "revenue_crop_mean",
+  note      = note1,
+  colspec   = spec1,
+  # supers    = list(list(label = "",           span = 1),
+  #                  list(label = "Economic",   span = 5),
+  #                  list(label = "Accounting", span = 5)),
+  labels    = labs1,
+  size_cmd  = "\\footnotesize",
+  tabcolsep_pt = 3,
+  rule_rows = "^Total$",
+  bold_rows = "^Total$"
+)
+
+
+# yield
+# ers costs of return studies to get operating costs
+
+# forgone revenues
+# rental rates
+
+
+# STATE: We believe that these numbers are upper bounds of wetland crop production. 
+
+# highlight acres, then what if they weren't cropped
+
+# reduced 
 
 # yield loss adjacent to wetland
 # per acre returns
