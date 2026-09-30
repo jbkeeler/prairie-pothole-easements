@@ -116,6 +116,8 @@ ggsave("figures/stutsman_easement_cdl.pdf", p_cdl,
        width = 7, height = 6.5, device = cairo_pdf, bg = "white")
 
 
+
+
 nassqs_auth(key = Sys.getenv("NASSQS_TOKEN"))
 
 # Parameters to query on and data call
@@ -124,10 +126,11 @@ params <- list(
   short_desc = "CORN, GRAIN - PRICE RECEIVED, MEASURED IN $ / BU",
   agg_level_desc = "STATE",
   state_fips_code = "38",
-  year = years
+  year = years,
+  freq_desc = "ANNUAL"
   )
 
-cnty_pasture_rents <- nassqs(params) |>
+corn_prices <- nassqs(params) |>
   as.data.table()
 
 cols <- c("state_fips_code","county_code","year","Value")

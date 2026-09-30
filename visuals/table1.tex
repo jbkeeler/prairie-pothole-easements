@@ -1,0 +1,45 @@
+\begin{table}[htpb!] % [htpb!] for float
+\centering
+\begin{threeparttable}
+\captionsetup{justification=raggedright,singlelinecheck=true}
+\caption{Summary of U.S. Agricultural Trade Indicators, 2018–2025.}
+\label{tab:trade_summary}
+\rowcolors{2}{lightgray}{white} % alternating row color
+\small
+
+% % % CHANGE THIS PART
+
+\begin{tabular}{L{4.2cm} C{2.5cm} C{2.2cm} C{2.2cm} C{3.0cm}}
+\toprule
+\rowcolor{ndsu}
+{\color{white}\bfseries Commodity} &
+{\color{white}\bfseries 2018--2020 Avg.} &
+{\color{white}\bfseries 2021} &
+{\color{white}\bfseries 2022} &
+{\color{white}\bfseries 2023--2025 (Proj.)} \\
+\midrule
+Corn Exports (MMT) & 55.3 & 61.8 & 53.1 & 50.0 \\
+Soybean Exports (MMT) & 44.1 & 58.7 & 54.9 & 56.5 \\
+Wheat Exports (MMT) & 26.2 & 22.7 & 20.1 & 19.8 \\
+Beef Exports (Billion \$) & 8.4 & 10.7 & 11.3 & 12.1 \\
+Pork Exports (Billion \$) & 6.5 & 7.8 & 7.4 & 7.2 \\
+\midrule
+\textbf{Total Ag Exports (Billion \$)} & \textbf{145.2} & \textbf{177.0} & \textbf{192.8} & \textbf{195.4} \\
+\bottomrule
+\end{tabular}
+
+% % % % 
+
+\vspace{1.5pt}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\setlength{\leftmargin}{0pt}      % remove item indentation
+\setlength{\labelsep}{0pt}        % no gap before item text
+\setlength{\itemsep}{4pt}         % vertical space between items
+\setlength{\parsep}{0pt}          % no extra paragraph space
+\setlength{\parindent}{0pt}       % no paragraph indent
+\item\textit{Note:} Data represent calendar year exports. Projections for 2023–2025 are based on USDA baseline estimates. Data represent calendar year exports. Projections for 2023–2025 are based on USDA baseline estimates.\par
+\item\textit{Source:} U.S. Department of Agriculture, Foreign Agricultural Service.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

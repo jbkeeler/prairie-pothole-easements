@@ -1,0 +1,76 @@
+%%% Tables %%%
+\newcommand{\customtableformatting}{\renewcommand{\arraystretch}{1.1}\small}
+\AtBeginEnvironment{tabular}{\customtableformatting} % Apply to tabular.
+\AtBeginEnvironment{tabularx}{\customtableformatting} % Apply to tabularx.
+\preto\longtable{\customtableformatting} % Apply to longtable.
+
+\renewcommand\tabularxcolumn[1]{m{#1}}
+\newcolumntype{C}{>{\centering\arraybackslash}X} % Center the 'X' command in tabularx.
+\newcolumntype{L}{>{\raggedright\arraybackslash}X} % Left the 'X' command in tabularx.
+\newcolumntype{R}{>{\raggedleft\arraybackslash}X} % Right the 'X' command in tabularx.
+
+%%% Captions %%%
+\captionsetup{skip=6pt} % Whitespace between figures/tables and the caption.
+\captionsetup{
+    labelfont={bf,small},
+    textfont={it,small}
+} % Caption font style.
+\captionsetup[table]{skip=4pt}
+
+%%% Lists %%%
+\setlist{noitemsep} % Customise spacing around and inside lists.
+
+\usepackage{array}              % for m{width}
+\newcolumntype{L}[1]{>{\footnotesize\raggedright\arraybackslash}m{#1}}
+\newcolumntype{C}[1]{>{\footnotesize\centering\arraybackslash}m{#1}}
+\setlength{\aboverulesep}{0pt}
+\setlength{\belowrulesep}{0pt}
+\setlength{\extrarowheight}{10pt} % extra row height
+\setlength{\tabcolsep}{8pt}       % horizontal padding between columns
+
+\usepackage{pgfplots}
+\pgfplotsset{
+  compat=1.17,
+  every axis/.append style={
+    label style={font=\small\crimsonfont\color{black}},
+    tick label style={font=\footnotesize\crimsonfont},
+    xticklabel style={inner sep=5pt, font=\scriptsize\crimsonfont},
+    yticklabel style={inner sep=5pt, font=\scriptsize\crimsonfont}, 
+    legend style={
+      font=\footnotesize\crimsonfont,
+      draw=none,
+      at={(0.5,-0.25)},
+      anchor=north,
+      legend columns=-1
+    },
+    grid=both,
+    grid style={line width=.1pt, draw=ndsuGray!40, dashed}
+  }
+}
+
+\usepackage{textcase} % for \MakeTextUppercase, \MakeTitleCase
+
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{textcase}
+
+\usepackage{textcase}
+\usepackage{titlecaps} % provides \titlecap for proper English title case
+
+\DeclareCaptionTextFormat{TitleCase}{\titlecap{#1}}
+
+% Keep common American-English "small words" lowercase unless first/last
+\Addlcwords{
+a an and as at but by en for if in of on or the to v via vs
+aboard about above across after against along amid among anti around as aslant astride atop
+before behind below beneath beside besides between beyond despite down during except following from inside into like minus near next onto opposite outside over past per plus round save since than through throughout till times toward towards under underneath unlike until up upon versus with within without
+}
+% Caption format: Title Case (with the lc-words above) + bold + left aligned
+\DeclareCaptionTextFormat{TitleCase}{\textbf{\titlecap{#1}}}
+\captionsetup{
+  textformat=TitleCase
+}
+
+\let\OldCaption\caption
+\renewcommand{\caption}[2][]{%
+  \OldCaption[#1]{\textbf{\TitleCaseCaption{#2}}}%
+}

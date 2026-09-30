@@ -1,0 +1,41 @@
+\RaggedRight
+
+\AddToShipoutPictureBG{%
+  \AtPageLowerLeft{\includegraphics[width=\paperwidth,height=\paperheight]{theme/background/main.pdf}}%
+}
+
+\AddToShipoutPictureBG*{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \clip (current page.south west) rectangle (current page.north east);
+    \node[anchor=south west, xshift=-1.3mm, yshift=-1.3mm]
+      at (current page.south west)
+      {\includegraphics[width=\paperwidth]{theme/background/front.pdf}};
+  \end{tikzpicture}%
+}
+
+\vspace*{-2.5cm}\hspace*{-0.5cm}\noindent\includegraphics[width=0.57\linewidth]{theme/background/logo.pdf}
+
+\vspace*{0.75cm}
+
+{\noindent\fontsize{20}{20}\selectfont{\color{ndsu}\centering\GetSubtitle\par}}
+
+\vspace{0.5cm}
+
+{\noindent\fontsize{13}{13}\selectfont{\bfseries\color{ndsu}\centering\GetSchool\par}}
+\vspace{0.25cm}
+
+{\noindent\fontsize{11}{11}\selectfont{\color{ndsu}\centering\today\par}}
+\vspace*{0.25cm}
+
+{\noindent\fontsize{13}{13}\selectfont{\bfseries \color{ndsu}\centering\GetTitle\par}
+
+\vspace{0.25cm}
+
+{\noindent\fontsize{13}{13}\selectfont{\color{red}\centering{FOR INTERNAL USE}\par}}
+
+\noindent\hspace*{-\oddsidemargin}\hspace*{-1in}{\color{ndsu}\rule{\paperwidth}{2pt}}\par
+\vspace*{-0.4cm}
+{\noindent\fontsize{11}{11}\selectfont{{\color{ndsu} \bfseries Notice:}~\color{black} This memorandum is provided for internal awareness, coordination, and discussion, and the content may be refined as new data or feedback becomes available. Please keep circulation within the named recipients; please do not quote, post, or distribute externally without approval.}}}\par
+\vspace*{-0.6cm}
+\noindent\hspace*{-\oddsidemargin}\hspace*{-1in}{\color{ndsu}\rule{\paperwidth}{2pt}}\par
+\vspace*{-1cm}

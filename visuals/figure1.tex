@@ -1,0 +1,52 @@
+\begin{figure}[h!] % [H] for no float
+\captionsetup{justification=raggedright,singlelinecheck=true}
+\caption{Trends in U.S. Agricultural Exports, 2018–2025.}
+\label{fig:ag_exports}
+\begin{threeparttable}
+\centering
+
+% --- chart ---
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.85\textwidth,
+  height=8cm,
+  ymin=0, ymax=150,
+  ytick={0,25,50,75,100,125,150},
+  yticklabels={0,25,50,75,100,125,150},  
+  xlabel={Year},
+  ylabel={Index (2018 = 100)},
+  xtick=data,
+  xticklabels={2018,2019,2020,2021,2022,2023,2024,2025},
+  legend cell align={left}
+]
+  % Actual
+  \addplot+[mark=*,
+    mark options={fill=ndsu, draw=ndsu},
+    color=ndsu, thick
+  ] coordinates {(1,100) (2,103) (3,98) (4,107) (5,112) (6,115) (7,118) (8,121)};
+  \addlegendentry{Actual Exports}
+
+  % Projected
+  \addplot+[mark=square*,
+    mark options={fill=ndsuGold, draw=ndsuGold!100!black},
+    color=ndsuGold!100!black, thick
+  ] coordinates {(1,100) (2,102) (3,104) (4,108) (5,113) (6,118) (7,122) (8,126)};
+  \addlegendentry{Projected Exports}
+\end{axis}
+\end{tikzpicture}
+
+% --- notes/source, aligned to figure width ---
+\vspace{3pt}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\setlength{\leftmargin}{0pt}      % remove item indentation
+\setlength{\labelsep}{0pt}        % no gap before item text
+\setlength{\itemsep}{4pt}         % vertical space between items
+\setlength{\parsep}{0pt}          % no extra paragraph space
+\setlength{\parindent}{0pt}       % no paragraph indent
+\item \textit{Note:} Index values are normalized to 2018 = 100. Solid line indicates observed exports; dashed line shows projected growth. Solid line indicates observed exports; dashed line shows projected growth.
+\item \textit{Source:} U.S. Department of Agriculture, Foreign Agricultural Service; ARPC analysis.
+\end{tablenotes}
+
+\end{threeparttable}
+\end{figure}

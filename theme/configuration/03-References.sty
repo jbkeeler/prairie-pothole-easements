@@ -1,0 +1,172 @@
+%%% Bibliography %%%
+\usepackage[
+  backend=bibtex,           
+  style=authoryear,
+  citestyle=authoryear,
+  sorting=nyt,
+  doi=true,
+  url=false,
+  dashed=false,
+  uniquelist=false,
+  natbib=true,
+  date=year,
+  maxbibnames=5     % <— show all authors in bibliography
+]{biblatex}
+
+% --- Bibliography formatting: italic titles, upright journals, no quotes ---
+\DeclareFieldFormat[article,inbook,incollection,inproceedings,book,thesis,unpublished,report]{title}{\mkbibemph{#1}} % Italic, no quotes
+\DeclareFieldFormat[article]{journaltitle}{#1}  % Upright (not italic)
+\DeclareFieldFormat[article]{issuetitle}{#1}
+\DeclareFieldFormat[article]{booktitle}{#1}
+
+% Prevent biblatex from adding quotation marks around titles
+\DeclareFieldFormat{titlecase}{#1}
+\DeclareFieldFormat{citetitle}{#1}
+\DeclareFieldFormat{maintitle}{#1}
+\DeclareFieldFormat{booktitle}{#1}
+\DeclareFieldFormat{journaltitle}{#1}
+\DeclareFieldFormat{issuetitle}{#1}
+
+% --- Hide month/day even if present in .bib ---
+\AtEveryBibitem{%
+  \clearfield{month}%
+  \clearfield{day}%
+}
+
+\DeclareFieldFormat{doi}{%
+  \ifhyperref
+    {\href{https://doi.org/#1}{\url{https://doi.org/#1}}}%
+    {\url{https://doi.org/#1}}%
+}
+
+\renewbibmacro{in:}{}
+
+% --- Desired volume(number): pages formatting without duplication ---
+\DeclareFieldFormat[article]{volume}{#1}
+\DeclareFieldFormat[article]{number}{\mkbibparens{#1}}
+\DeclareFieldFormat[article]{pages}{#1} % no "pp."
+
+% Use a colon before pages (instead of the default comma)
+\renewcommand*{\bibpagespunct}{\addcolon\space}
+
+\makeatletter
+\renewbibmacro*{volume+number+eid}{%
+  \printfield{volume}%
+  \printfield{number}%
+  % (don’t insert any punctuation here)
+}
+\makeatother
+
+\setlength\bibitemsep{1.5\itemsep} % Increase spacing between bibliography items.
+\setlength\bibhang{0pt} % Remove hanging indent for bibliography entries.
+\addbibresource{arpc-memo-references.bib} % Load the bibliography file.
+
+% Configure citation style to include both author and year prominently.
+\ExecuteBibliographyOptions{maxcitenames=2}
+\DeclareFieldFormat{citehyperref}{%
+    \DeclareFieldAlias{bibhyperref}{noformat}%
+    \bibhyperref{#1}%
+}
+
+\DeclareFieldFormat{textcitehyperref}{%
+    \DeclareFieldAlias{bibhyperref}{noformat}%
+    \bibhyperref{%
+        #1%
+        \ifbool{cbx:parens}
+        {\bibcloseparen\global\boolfalse{cbx:parens}}
+    {}}%
+}
+    
+\savebibmacro{cite}
+\savebibmacro{textcite}
+\renewbibmacro*{cite}{%
+    \printtext[citehyperref]{%
+        \restorebibmacro{cite}%
+        \usebibmacro{cite}%
+    }}
+    
+\renewbibmacro*{textcite}{%
+    \ifboolexpr{
+        ( not test {\iffieldundef{prenote}} and
+          test {\ifnumequal{\value{citecount}}{1}} )
+        or
+        ( not test {\iffieldundef{postnote}} and
+          test {\ifnumequal{\value{citecount}}{\value{citetotal}}} )
+    }
+    {\DeclareFieldAlias{textcitehyperref}{noformat}}
+    {}%
+    \printtext[textcitehyperref]{%
+    \restorebibmacro{textcite}%
+    \usebibmacro{textcite}}%
+}
+
+% Hyperlink settings.
+\hypersetup{
+    bookmarksnumbered, % Enables the chapter and section numbers within the PDF bookmarks.
+	colorlinks=true, % Enable colored text for links.
+	urlcolor=maincolor, % Color for \url and \href links.
+	linkcolor=maincolor, % Color for internal links (e.g., \nameref).
+	citecolor=black, % Color for citation links.
+}
+
+% Add a "." after the number in the PDF bookmark.
+\def\Hy@numberline#1{\ifHy@bookmarksnumbered{#1.\hspace{0.3em}}\else#1\fi}
+
+% --- For books: show URL, hide ISBN ---
+\AtEveryBibitem{%
+  \ifentrytype{book}{%
+    \clearfield{doi} % optional: remove DOI for books if present
+    \clearfield{eprint} % optional: remove arXiv/etc.
+    \clearfield{month}%
+    \clearfield{day}%
+    % Keep URL if present
+  }{}%
+  % Remove ISBN globally
+  \clearfield{isbn}%
+}
+
+% --- Make URLs printable (we'll hide them for non-books below) ---
+\ExecuteBibliographyOptions{url=true,isbn=false} % show URLs generally, suppress ISBN globally
+
+% --- Titles: italic, no quotes (the quotes come from the title bibmacro) ---
+\renewbibmacro*{title}{%
+  \ifboolexpr{ test {\iffieldundef{title}} }
+    {}
+    {\printtext{\mkbibemph{\printfield[titlecase]{title}}}%
+     \newunit}%
+}
+
+% If you also print "booktitle" (e.g., in incollection), make it italic and unquoted too:
+\renewbibmacro*{booktitle}{%
+  \ifboolexpr{ test {\iffieldundef{booktitle}} }
+    {}
+    {\printtext{\mkbibemph{\printfield[titlecase]{booktitle}}}%
+     \newunit}%
+}
+
+% --- Journals upright (not italic) ---
+\DeclareFieldFormat{journaltitle}{#1}
+\DeclareFieldFormat{journalsubtitle}{#1}
+\DeclareFieldFormat{issuetitle}{#1}
+\DeclareFieldFormat{issuesubtitle}{#1}
+
+% --- Show URL only for books; hide for everything else ---
+\AtEveryBibitem{%
+  \ifentrytype{book}
+    {}% leave URL intact for books
+    {\clearfield{url}}% remove URL for non-books
+}
+
+% Optional: put book URL on a new line for readability
+\DeclareFieldFormat[book]{url}{\newline\url{#1}}
+
+% Bibliography spacing & hanging indent
+\setlength\bibitemsep{1.5\itemsep} % keep if you like extra vertical space
+\setlength\bibhang{2em}            % hanging indent: indent all lines after the first
+
+\AtEveryBibitem{%
+  \ifentrytype{book}{%
+    \clearlist{location}%
+    \clearfield{address}% for legacy BibTeX fields
+  }{}%
+}

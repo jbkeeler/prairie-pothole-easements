@@ -1,0 +1,89 @@
+% % % --------------------------------------------------------------------------------------
+% % % ARPC Memo Template
+% % % --------------------------------------------------------------------------------------
+
+\documentclass{theme/arpc-memo}
+
+% % % --------------------------------------------------------------------------------------
+% % % Document Metadata (EDIT)
+% % % --------------------------------------------------------------------------------------
+
+\Authors{Shawn Arita, Matthew Gammans, Khashi Ghorbani, James Keeler}
+
+\Title{ARPC Memo}
+
+\Subtitle{TITLE}
+
+\School{Agricultural Risk Policy Center, North Dakota State University}
+
+%\AtBeginDocument{\renewcommand{\today}{October 24, 2025}}  % In case you want a different issuing date than \today
+
+% % % --------------------------------------------------------------------------------------
+% % % Main Document
+% % % --------------------------------------------------------------------------------------
+
+\begin{document}
+
+% % % --------------------------------------------------------------------------------------
+% % % Front Matter
+% % % --------------------------------------------------------------------------------------
+
+\input{theme/frontend.tex}
+
+% % % --------------------------------------------------------------------------------------
+% % % Main (EDIT)
+% % % --------------------------------------------------------------------------------------
+
+\section{Key Insights} % fit on one page
+
+\begin{itemize}
+
+\item {\textbf{\color{ndsu} Bla 1 is cool!}} Cool is bla 1.
+
+\item  {\textbf{\color{ndsu} Bla 2 is cool!}} Cool is bla 2.
+
+\item  {\textbf{\color{ndsu} Bla 3 is cool!}} Cool is bla 3.
+
+\end{itemize}
+
+\clearpage
+
+\section{Background}
+
+\lipsum[1-2]
+
+\autoref{tab:trade_summary} summarizes the changes. \lipsum[1]  For this work, we cited \citet{Anderson2003} and the broader literature \citep[e.g.,][]{Yotov2016, Arita2025, Kim2025}.
+
+\input{visuals/table1.tex}
+
+\subsection{Analysis of the Temporary Grain Storage Support Program}
+
+The summary is provided in \autoref{fig:ag_exports}. \lipsum[1][1-28]
+
+% \input{visuals/figure1.tex}
+
+\lipsum[1-3][1-28]
+
+% \input{visuals/figure2.tex}
+
+\section{Conclusion}
+
+\lipsum[1-3][1-28]
+
+% % % --------------------------------------------------------------------------------------
+% % % References
+% % % --------------------------------------------------------------------------------------
+
+\clearpage\printbibliography[title={References}]
+
+% % % --------------------------------------------------------------------------------------
+% % % Disclaimer and Back End
+% % % --------------------------------------------------------------------------------------
+
+\input{theme/backend.tex}
+
+% % % --------------------------------------------------------------------------------------
+% % % Closure
+% % % --------------------------------------------------------------------------------------
+
+\end{document}
