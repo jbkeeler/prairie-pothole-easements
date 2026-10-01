@@ -8,7 +8,7 @@
 % % % Document Metadata (EDIT)
 % % % --------------------------------------------------------------------------------------
 
-\Authors{Shawn Arita, Matthew Gammans, Khashi Ghorbani, James Keeler}
+\Authors{Matthew Gammans, Khashi Ghorbani, James Keeler, Shawn Arita, and Sandro Steinbach}
 
 \Title{ARPC Memo}
 
@@ -45,19 +45,19 @@
 
 \begin{itemize}
 
-\item {\textbf{\color{ndsu} The 4.2 to 4.5 million acre figure is close to our estimate of wetlands plus setbacks.}} FWS easements cover about 1.03 million wetland acres inside 6.4 million acres of easement tracts. Adding the setback areas we estimate around those wetlands brings the total to about 4.0 million acres under the FWS standard, close to the figures cited at the Interior roundtable. Under the narrower NRCS standard, the total is about 2.3 million acres. These setback estimates are rough and depend heavily on assumptions.
+\item {\textbf{\color{ndsu} The 4.2 to 4.5 million acre figure is close to our estimate of wetlands plus setbacks.}} FWS easements cover about 1.03 million wetland acres inside 6.4 million acres of easement tracts. Adding the setback areas we estimate around those wetlands brings the total to about 4.0 million acres under the FWS standard. Under the narrower NRCS standard, the total is about 2.3 million acres. These setback estimates are rough and depend heavily on assumptions.
 
-\item {\textbf{\color{ndsu} Most eased acres are decades old.}} The U.S. Fish and Wildlife Service (FWS) holds perpetual easements on 1.03 million wetland acres in North Dakota across 15,735 tracts; 73\% of those acres were signed in the 1960s and 1970s.
+\item {\textbf{\color{ndsu} Most eased acres are decades old.}} The U.S. Fish and Wildlife Service (FWS) holds perpetual easements on wetland easement acres in North Dakota across 15,735 tracts; 73\% of those acres were signed in the 1960s and 1970s.
 
 \item {\textbf{\color{ndsu} Drain tile setbacks came later.}} Setbacks were not written into most original easement agreements. FWS set them through internal guidance, a 2020 Director's memo, and a May 13, 2024 final rule.
 
-\item {\textbf{\color{ndsu} FWS setbacks are much wider than NRCS's.}} The statewide median setback is 160 ft under the FWS standard versus 70 ft under the NRCS standard, and 32\% of tracts have a setback above 500 ft under FWS versus 1.4\% under NRCS. In about 27\% of tracts, wetlands and FWS setbacks together cover the entire tract.
+\item {\textbf{\color{ndsu} FWS setbacks are much wider than NRCS's.}} The statewide median setback is 160 ft under our approximation of the FWS standard versus 70 ft under the NRCS standard, and 32\% of tracts have a setback above 500 ft under FWS versus 1.4\% under NRCS. In about 27\% of tracts, wetlands and FWS setbacks together cover the entire tract.
 
 \item {\textbf{\color{ndsu} About 0.6 to 1.6 million of those acres are cropped.}} From 2021 to 2025, an average of 1.57 million acres inside wetlands and FWS setbacks were planted to crops, mostly soybeans, spring wheat, and corn. Under NRCS setbacks, the average is 0.62 million acres.
 
-\item {\textbf{\color{ndsu} Upper-bound value at stake: roughly \$65 to \$330 per cropped acre per year.}} Cash rent on this cropland averages \$65 per acre (\$41 to \$102 million per year in total, under NRCS and FWS setbacks). Gross crop revenue, after a 15\% yield discount for wetland ground, averages about \$330 per acre (\$200 to \$509 million per year). These are upper bounds, not costs: setbacks limit drain tile, not farming, and production costs are not yet subtracted.
+\item {\textbf{\color{ndsu} Upper-bound value of cropland value covered by easements and setbacks is roughly \$65 to \$330 per cropped acre per year.}} Cash rent on this cropland averages \$65 per acre (\$41 to \$102 million per year in total, under NRCS and FWS setbacks). Gross crop revenue, after a 15\% yield discount for production on wetland, averages about \$330 per acre (\$200 to \$509 million per year). These are upper bounds, not costs: setbacks limit drain tile, not farming, and production costs are not yet subtracted.
 
-\item {\textbf{\color{ndsu} Most wetland basins are small.}} About three in four mapped wetland basins on easement tracts are under one acre, but together they make up only about 14\% of wetland acres. This matters for the FWS consolidation pilot, which targets basins under one acre.
+\item {\textbf{\color{ndsu} Most wetland basins are small.}} About three in four mapped wetland basins on easement tracts are under one acre, but together they make up only about 14\% of wetland acres. This matters for a potential FWS consolidation pilot, which may target basins under one acre.
 
 \end{itemize}
 
@@ -69,7 +69,7 @@ The U.S. Fish and Wildlife Service has bought perpetual wetland easements in the
 
 FWS records each easement as a realty tract: the parcel of land covered by the agreement with the landowner. The eased wetlands are only part of each tract. FWS mapping data give the tract boundary and the total eased wetland acres inside it, but not where those wetlands are within the tract. % TODO: confirm tract definition against FWS realty documentation.
 
-The National Wetland Inventory (NWI) dataset shows 4.2 million acres of wetlands in North Dakota (\autoref{fig:nwi_nd}). This total includes lakes and other open water, as well as wetlands that are not under easement.
+The National Wetland Inventory (NWI) dataset shows 4.2 million acres of wetlands in North Dakota (\autoref{fig:nwi_nd}). This total includes lakes and other open water, as well as wetlands that are not under easement currently.
 
 \begin{figure}[htpb!]
 \centering
@@ -93,7 +93,7 @@ Drain tile setbacks were not written into most original easement agreements. In 
 
 The calculation of the FWS tile setback distance is comparable to the Natural Resources Conservation Service (NRCS) lateral effect distance, since both use the van Schilfgaarde equation. However, NRCS uses fixed, published inputs and a 500-ft cap under a ``minimal effect'' standard, where a 12-inch drawdown is allowed over a 14-day period (PPR210-650-H, 2022). FWS calculates each site individually under a ``must not be drained'' standard, cuts the setback off at the catchment boundary upslope, and applies the full distance downslope (FWS Director's Memo, 2020; 50 CFR 25.24). The NRCS assumptions are listed in \autoref{app:nrcs}.
 
-We followed the formula specified in Title 210, National Engineering Handbook (PPR210-650-H, May 2022) and computed the lateral effect distances based on field and wetland soil types under the NRCS and FWS standards.
+We followed the formula specified in Title 210, National Engineering Handbook (PPR210-650-H, May 2022) and computed the lateral effect distances based on field and wetland soil types under the NRCS and FWS standards, which we approximate below.
 
 The median setback distance is roughly 2.5 times larger under the FWS standard than under the NRCS standard (\autoref{tab:setback_county}). The only parameter changed when computing the setback distance under the FWS standard is the drawdown level, which we assumed to be 1.2 inches over a 14-day period. The setback distance needs to be calculated for each tract separately based on its field and wetland soil types; for simplicity, we used the dominant field and wetland soil types, meaning the soil types that cover the most acreage in each tract according to the USDA soil survey (SSURGO).\footnote{We assume a shallow tile line, 2 ft deep with a 3-inch diameter. Deeper, larger tile (7 ft, 12 inches) produces wider setbacks: a median of 290 ft under the FWS standard.} In practice, setbacks are computed from every soil type in a tract and would vary across the tract (NRCS National Engineering Handbook, Part 650, Chapter 19). Our estimates are a rough approximation of the most likely setback for each tract.
 
@@ -119,7 +119,7 @@ The FWS dataset does not explicitly locate the eased wetlands; it only contains 
 
 Figures of 4.2 and 4.5 million acres have been cited for the area governed by setbacks. Depending on what is counted, the number could be very different (\autoref{tab:acreage}). Easement tracts cover about 6.4 million acres, but only 1.03 million of those are eased wetlands. Adding our estimated FWS setback buffers around those wetlands gives about 4.0 million acres, which is close to the cited range. Using NRCS-standard setbacks instead gives about 2.3 million acres. The 4.2 million figure also matches total NWI wetland acres statewide, eased or not, so it is possible the cited number counts something else.
 
-Our 2.3 to 4.0 million acre range should be treated with caution. Even the high end assumes FWS setbacks around every mapped wetland, and setbacks computed from full soil maps or for other tile designs would differ. Our totals also exclude about 2,050 FWS grassland easement tracts in North Dakota (about 0.66 million documented acres), which carry different restrictions.
+Our 2.3 to 4.0 million acre range should be treated with caution. Even the high end assumes FWS setbacks around every mapped wetland in easement tracts, and setbacks computed from full soil maps or for other tile designs would differ. Our totals also exclude about 2,050 FWS grassland easement tracts in North Dakota (about 0.66 million documented acres), which carry different restrictions.
 
 Of the 4.0 million acres inside wetlands and setbacks, an average of 1.57 million acres (about 40\%) were planted to crops from 2021 to 2025, based on USDA's satellite-derived Cropland Data Layer. The rest is open water, wetland vegetation, grassland and pasture, fallow, and other land cover. Under NRCS setbacks, 0.62 million of the 2.3 million acres (about 27\%) were cropped.
 
@@ -168,7 +168,7 @@ Cropped acres inside wetlands plus NRCS setback buffer (2021--2025 average) & 0.
 
 To gauge what is at stake for producers, we valued the cropped land inside wetlands and setbacks in two ways. First, at county average cash rents and land values (\autoref{tab:cropland_rent_year}), this land rents for about \$102 million per year in total (\$65 per acre) and is worth about \$3.8 billion (\$2,400 per acre).
 
-Second, we estimated gross crop revenue (\autoref{tab:revenue_crop_mean}). We matched the crops grown on this land each year, from the Cropland Data Layer, with USDA county yields and state prices. Crops grown in and next to wetlands yield less than the rest of the field, so we reduced county yields by 15\%, based on yield-monitor data from prairie pothole fields in Saskatchewan (\href{https://doi.org/10.1016/j.agsy.2024.104169}{Boldt et al., 2025}). Revenue averages \$509 million per year, or about \$330 per cropped acre. Soybeans, corn, spring wheat, and canola account for 87\% of the total. Both tables use FWS-standard setbacks. Under NRCS-standard setbacks, fewer acres are affected, and the totals fall to about \$41 million per year in rent, \$1.5 billion in land value, and \$200 million per year in revenue; per-acre values are nearly the same.
+Second, we estimated gross crop revenue (\autoref{tab:revenue_crop_mean}). We matched the crops grown on this land each year, from the Cropland Data Layer, with USDA NASS surveyed county yields and state marketing year prices. Crops grown in and next to wetlands yield less than the rest of the field, so we reduced county yields by 15\%, based on yield-monitor data from prairie pothole fields in Saskatchewan (\href{https://doi.org/10.1016/j.agsy.2024.104169}{Boldt et al., 2025}). Revenue averages \$509 million per year, or about \$330 per cropped acre. Soybeans, corn, spring wheat, and canola account for 87\% of the total. Both tables use FWS-standard setbacks. Under NRCS-standard setbacks, fewer acres are affected, and the totals fall to about \$41 million per year in rent, \$1.5 billion in land value, and \$200 million per year in revenue; per-acre values are nearly the same.
 
 \input{tables/cropland_rent_summary_year.tex}
 
@@ -187,7 +187,7 @@ These estimates may not reflect the performance of any particular field or farm.
 \section{Next Steps}
 
 \begin{itemize}
-\item \textbf{Net returns.} Subtract production costs, using NDSU crop budgets, to estimate lost net returns rather than gross revenue.
+\item \textbf{Net returns.} Subtract production costs, using USDA costs of production and/or NDSU crop budgets, to estimate lost net returns rather than gross revenue.
 \item \textbf{Cost of farming around wetlands.} Irregular field shapes increase overlap of seed, fertilizer, and spray, along with fuel and time. Boldt et al. (2025) estimate these overlap and nuisance costs from field path data. We could measure how irregular each field is, or simulate equipment paths with and without setbacks.
 \item \textbf{Which wetlands still hold water.} NWI maps are often decades old and may not show current wetland extents. Satellite water records at 10 to 30 meter resolution could show how many mapped basins have held water in recent years.
 \item \textbf{Range for the acreage estimate.} Narrow the 2.3 to 4.0 million acre range by computing setbacks from full soil maps and for other tile designs.

@@ -157,8 +157,4 @@ ggsave("figures/stutsman_easement_hydric.pdf", p_hydric,
 # paper on tile drainage using satellite data
 
 
-# pick the soil type that is more than 50%
 
-
-# find common map unit
-# get NWI wetlands
