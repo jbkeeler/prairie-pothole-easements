@@ -71,6 +71,13 @@ tract_buf_tab <- lapply(years, get_county_CDL_acreage, poly = tract_buffers) |>
 
 saveRDS(tract_buf_tab, "data/processed/cdl_tract_buf_acres_nd.rds")
 
+# cropped acres under NRCS-standard setbacks, for the memo's acreage range
+nrcs_buffers <- readRDS("data/processed/nwi_wet_buf_LE_2ft_3in_12in_ft_nd.rds") |>
+  st_transform(5070)
+nrcs_buf_tab <- lapply(years, get_county_CDL_acreage, poly = nrcs_buffers) |>
+  rbindlist()
+saveRDS(nrcs_buf_tab, "data/processed/cdl_tract_buf_acres_LE_2ft_3in_12in_ft_nd.rds")
+
 
 y <- 2025
 cdl <- rast(file.path("data/raw/CDL",paste0(y,"_30m_cdls.tif")))
@@ -486,12 +493,33 @@ crop_revenue[, yield_source := fcase(!is.na(cnty_yield), "county",
 crop_revenue <- prices[, .(class_name, year, price = Value, price_unit)][crop_revenue, on = .(class_name, year)]
 crop_revenue <- unique(yields[, .(class_name, yield_unit)])[crop_revenue, on = "class_name"]
 
-crop_revenue[, revenue_per_acre := price * yield]
+wetland_discount_factor <- 0.85
+
+crop_revenue[, revenue_per_acre := price * yield * wetland_discount_factor]
 
 setnames(crop_revenue, "county_code", "COUNTYFP")
 crop_revenue <- crop_revenue[, .(class_name, COUNTYFP, year, price, price_unit,
                                  yield, yield_unit, yield_source, revenue_per_acre)]
 setorder(crop_revenue, class_name, COUNTYFP, year)
+
+
+# County cash rents and rented land values -------------------------------
+# ND Dept. of Trust Lands annual survey (source URL on Sheet2). The sheet has
+# no year column: it stacks 13 survey years, 2014-2026 oldest first, each a
+# block of 53 cropland rows then 53 pastureland rows. Checked against the
+# 2022 and 2026 PDFs (Stutsman cropland: $83.60 / $3,015 and $98.80 / $3,614).
+rents <- read_excel("data/processed/NDcountyRents_prices2026.xlsx", sheet = "Sheet1") |>
+  as.data.table()
+setnames(rents, c("county", "GEOID", "land_type", "rent_per_acre", "land_value_per_acre"))
+stopifnot(nrow(rents) == 13 * 2 * 53)
+rents[, year := 2014L + (.I - 1L) %/% (2L * 53L)]
+rents[, COUNTYFP := sprintf("%03d", as.integer(GEOID) %% 1000L)]
+
+cropland_rents <- rents[land_type == "cropland" & year %in% years,
+                        .(COUNTYFP, year, rent_per_acre, land_value_per_acre)]
+
+crop_revenue <- cropland_rents[crop_revenue, on = .(COUNTYFP, year)]
+setcolorder(crop_revenue, c("class_name", "COUNTYFP", "year"))
 
 
 saveRDS(crop_revenue,"data/processed/crop_revenue_per_acre_nd.rds")
@@ -502,6 +530,8 @@ saveRDS(crop_revenue,"data/processed/crop_revenue_per_acre_nd.rds")
 tract_buf_revenue <- crop_revenue[tract_buf_tab[, .(class_name, COUNTYFP, GEOID, NAME, year, acres)],
                                   on = .(class_name, COUNTYFP, year), nomatch = NULL]
 tract_buf_revenue[, total_revenue := acres * revenue_per_acre]
+tract_buf_revenue[, total_rent := acres * rent_per_acre]
+tract_buf_revenue[, total_land_value := acres * land_value_per_acre]
 setorder(tract_buf_revenue, GEOID, year, -total_revenue)
 
 # buffer acres left unvalued, by crop
@@ -525,44 +555,98 @@ revenue_summary_crop_mean <- revenue_summary_crop_year[, .(mean_revenue = sum(to
   order(class_name == "Total", -mean_revenue)]
 revenue_summary_crop_mean[, mean_revenue_fmt := label_dollar()(mean_revenue)]
 
-revenue_summary_crop_mean <- revenue_summary_crop_mean[,.(class_name,mean_revenue_fmt)]
+spec1 <- "L{2.8cm} R{2.6cm}"
 
-# Planted acres were dropped on 2026-09-09 (not cited in the body, and the
-# loss column already carries scale), and the freed width went to the
-# remaining columns. The crop column is 2.3cm so "Grain Sorghum" stays on
-# one line, and the accounting loss-years column is 1.25cm so "No Loss" does
-# not wrap. Total width is 15.25cm + 11 x 2 x 3pt tabcolsep = 17.57cm, inside
-# the 17.78cm textwidth.
-spec1 <- paste("L{2.3cm}",
-               "C{1.1cm}")
-
-labs1 <- c("Crop",
-           "Mean Revenue Loss",)
+labs1 <- c("Crop", "Mean Annual Revenue")
 
 note1 <- paste0(
-  "Dollar columns sum losses and payments over the loss years only. ",
-  "All-year coverage counts payments from every year, including those with no ",
-  "loss, against the same loss total. No Loss marks a crop whose net revenue ",
-  "was positive in every year on that basis. The Total row treats the nine ",
-  "crops as one portfolio. ARC/PLC is modeled from program rules and scaled ",
-  "state by state to Farm Service Agency disbursements for 2019 to 2024."
+  "Revenue is cropped acres within wetland buffers on FWS easement tracts, ",
+  "from the Cropland Data Layer, times county yield and state marketing-year ",
+  "price from NASS. Where NASS does not publish a county yield, the pooled ",
+  "other-counties yield is used, then the state yield. Crops absent in a year ",
+  "count as \\$0 in the mean. CDL classes without a NASS price are excluded. ",
+  "County yields are multiplied by ", wetland_discount_factor, " to reflect ",
+  "lower yields in and near wetlands (Boldt et al., 2025)."
 )
 
+revenue_summary_crop_mean_tex <- revenue_summary_crop_mean[
+  , .(class_name, mean_revenue = label_dollar(prefix = "\\$")(mean_revenue))]
+
 save_latex_table_bands(
-  revenue_summary_crop_mean,
-  file_path = "./tables/revenue_summary_crop_mean.tex",
-  caption   = paste0("Mean Crop Revenue (2021 - 2025) for Acreage Within FWS Buffers"),
+  revenue_summary_crop_mean_tex,
+  file_path = "tables/revenue_summary_crop_mean.tex",
+  caption   = "Mean Crop Revenue (2021--2025) for Acreage Within FWS Buffers",
   label     = "revenue_crop_mean",
   note      = note1,
   colspec   = spec1,
-  # supers    = list(list(label = "",           span = 1),
-  #                  list(label = "Economic",   span = 5),
-  #                  list(label = "Accounting", span = 5)),
   labels    = labs1,
   size_cmd  = "\\footnotesize",
   tabcolsep_pt = 3,
   rule_rows = "^Total$",
   bold_rows = "^Total$"
+)
+
+
+# Total value of cropland rents on tract buffer acres ---------------------
+# Uses every cropped CDL acre in the buffers, including crops without a NASS
+# price, since cash rent does not depend on what is planted.
+tract_buf_rents <- cropland_rents[tract_buf_tab[, .(acres = sum(acres)), by = .(COUNTYFP, GEOID, NAME, year)],
+                                  on = .(COUNTYFP, year)]
+stopifnot(!anyNA(tract_buf_rents$rent_per_acre))
+tract_buf_rents[, `:=`(total_rent = acres * rent_per_acre,
+                       total_land_value = acres * land_value_per_acre)]
+setorder(tract_buf_rents, GEOID, year)
+
+saveRDS(tract_buf_rents, "data/processed/tract_buf_cropland_rents_nd.rds")
+
+rent_summary_year <- tract_buf_rents[, .(acres = sum(acres),
+                                         total_rent = sum(total_rent),
+                                         total_land_value = sum(total_land_value)),
+                                     by = year][order(year)]
+rent_summary_year <- rbind(rent_summary_year[, year := as.character(year)],
+                           rent_summary_year[, .(year = "Average",
+                                                 acres = mean(acres),
+                                                 total_rent = mean(total_rent),
+                                                 total_land_value = mean(total_land_value))])
+# acre-weighted county averages
+rent_summary_year[, `:=`(rent_per_acre = total_rent / acres,
+                         land_value_per_acre = total_land_value / acres)]
+
+rent_summary_year_tex <- rent_summary_year[, .(
+  year,
+  acres               = label_comma(accuracy = 1)(acres),
+  rent_per_acre       = label_dollar(prefix = "\\$", accuracy = 0.01)(rent_per_acre),
+  total_rent          = label_dollar(prefix = "\\$")(total_rent),
+  land_value_per_acre = label_dollar(prefix = "\\$")(land_value_per_acre),
+  total_land_value    = label_dollar(prefix = "\\$")(total_land_value)
+)]
+
+spec2 <- "L{1.3cm} R{1.5cm} R{1.5cm} R{2.1cm} R{1.7cm} R{2.5cm}"
+
+labs2 <- c("Year", "Cropped Acres", "Rent per Acre", "Total Cash Rent",
+           "Land Value per Acre", "Total Land Value")
+
+note2 <- paste0(
+  "Cropped acres are all Cropland Data Layer crop classes within wetland ",
+  "buffers on FWS easement tracts. Each county's acres are valued at that ",
+  "county's average cropland cash rent and average price of rented cropland ",
+  "for the survey year. Per-acre columns are acre-weighted averages across ",
+  "counties."
+)
+
+save_latex_table_bands(
+  rent_summary_year_tex,
+  file_path = "tables/cropland_rent_summary_year.tex",
+  caption   = "Cropland Cash Rent and Land Value for Acreage Within FWS Buffers",
+  label     = "cropland_rent_year",
+  note      = note2,
+  colspec   = spec2,
+  labels    = labs2,
+  size_cmd  = "\\footnotesize",
+  tabcolsep_pt = 3,
+  rule_rows = "^Average$",
+  bold_rows = "^Average$",
+  source    = "ARPC calculations using data from USDA and the North Dakota Department of Trust Lands."
 )
 
 

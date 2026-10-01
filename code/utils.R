@@ -98,24 +98,29 @@ save_latex_table <- function(df, file_path, caption, label, note, col_spec,
 # ----------------------------------------
 header_band <- function(colspec, supers, labels) {
   n <- length(labels)
-  sup_cells <- vapply(supers, function(s) {
-    if (s$label == "") {
-      if (s$span == 1) "" else sprintf("\\multicolumn{%d}{c}{}", s$span)
-    } else {
-      sprintf("\\multicolumn{%d}{c}{\\color{white}\\bfseries %s}", s$span, s$label)
-    }
-  }, character(1))
-  spans <- vapply(supers, function(s) s$span, numeric(1))
-  last  <- cumsum(spans)
-  first <- c(1, head(last, -1) + 1)
-  cmids <- unlist(mapply(function(s, a, b) {
-    if (s$label == "") character(0) else sprintf("\\cmidrule(lr){%d-%d}", a, b)
-  }, supers, first, last))
   lab_cells <- sprintf("{\\color{white}\\bfseries %s}", labels)
+  # no super-headers -> no super row and no cmidrules, just the labels
+  sup_rows <- character(0)
+  if (length(supers) > 0) {
+    sup_cells <- vapply(supers, function(s) {
+      if (s$label == "") {
+        if (s$span == 1) "" else sprintf("\\multicolumn{%d}{c}{}", s$span)
+      } else {
+        sprintf("\\multicolumn{%d}{c}{\\color{white}\\bfseries %s}", s$span, s$label)
+      }
+    }, character(1))
+    spans <- vapply(supers, function(s) s$span, numeric(1))
+    last  <- cumsum(spans)
+    first <- c(1, head(last, -1) + 1)
+    cmids <- unlist(mapply(function(s, a, b) {
+      if (s$label == "") character(0) else sprintf("\\cmidrule(lr){%d-%d}", a, b)
+    }, supers, first, last))
+    sup_rows <- c(paste0(paste(sup_cells, collapse = " & "), " \\\\"),
+                  paste0("\\arrayrulecolor{white}", paste(cmids, collapse = "")))
+  }
   c(sprintf("\\multicolumn{%d}{@{}>{\\columncolor{ndsu}[0pt][0pt]}c@{}}{%%", n),
     sprintf("\\begin{tabular}{%s}", colspec),
-    paste0(paste(sup_cells, collapse = " & "), " \\\\"),
-    paste0("\\arrayrulecolor{white}", paste(cmids, collapse = "")),
+    sup_rows,
     paste0(paste(lab_cells, collapse = " & "), " \\\\"),
     "\\end{tabular}%",
     "} \\\\",
@@ -161,7 +166,8 @@ tex_escape <- function(x) {
 #                   for BOTH the outer tabular and the nested header tabular.
 #                   That identity is what guarantees column alignment.
 # supers            ordered list of list(label=, span=); label = "" draws no
-#                   cmidrule. Spans must sum to ncol(df).
+#                   cmidrule. Spans must sum to ncol(df). NULL (the default)
+#                   drops the super-header row entirely.
 # labels            column labels; defaults to names(df)
 # size_cmd          e.g. "\\small" or "\\footnotesize"
 # tabcolsep_pt      optional \setlength{\tabcolsep}{Xpt}
@@ -170,25 +176,28 @@ tex_escape <- function(x) {
 #                   before them
 # bold_rows         regex on the first cell; matching rows are bolded cell by
 #                   cell
+# source            text of the Source: line in the table notes
 #
 # Striping is applied to the full body vector FIRST and the \midrule lines are
 # spliced in afterwards, so the stripe parity does not depend on how many rules
 # are inserted.
 # ----------------------------------------
 save_latex_table_bands <- function(df, file_path, caption, label, note,
-                                   colspec, supers, labels = names(df),
+                                   colspec, supers = NULL, labels = names(df),
                                    size_cmd = "\\footnotesize",
                                    tabcolsep_pt = 3,
                                    extrarowheight_pt = NULL,
                                    rule_rows = "^(Total|Average)$",
-                                   bold_rows = "^Total$") {
+                                   bold_rows = "^Total$",
+                                   source = "ARPC calculations using data from USDA.") {
 
   df <- as.data.frame(lapply(df, as.character), stringsAsFactors = FALSE,
                       check.names = FALSE)
 
   n_col <- ncol(df)
   stopifnot(length(labels) == n_col)
-  stopifnot(sum(vapply(supers, function(s) s$span, numeric(1))) == n_col)
+  stopifnot(is.null(supers) ||
+              sum(vapply(supers, function(s) s$span, numeric(1))) == n_col)
 
   labels <- tex_escape(labels)
   supers <- lapply(supers, function(s) {
@@ -242,7 +251,7 @@ save_latex_table_bands <- function(df, file_path, caption, label, note,
     "\\vspace{1.5pt}", "\\begin{tablenotes}[flushleft]", "\\footnotesize",
     "\\setlength{\\leftmargin}{0pt}\\setlength{\\labelsep}{0pt}\\setlength{\\itemsep}{4pt}",
     paste0("\\item\\textit{Note:} ", note, "\\par"),
-    "\\item\\textit{Source:} ARPC calculations using data from USDA.",
+    paste0("\\item\\textit{Source:} ", source),
     "\\end{tablenotes}", "\\end{threeparttable}", "\\end{table}"
   )
 

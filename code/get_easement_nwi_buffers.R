@@ -115,6 +115,12 @@ nwi_wet_buf <- union_wet_buf(nwi_buffers)
 
 saveRDS(nwi_wet_buf, "data/processed/nwi_wet_buf_LE_2ft_3in_1p2in_ft_nd.rds")
 
+# NRCS standard (12 in drawdown), same tile design, for the memo's acreage range
+nrcs_buffers <- get_wetland_buffers("LE_2ft_3in_12in_ft")
+saveRDS(nrcs_buffers, "data/processed/nwi_buffers_LE_2ft_3in_12in_ft_nd.rds")
+fwrite(tract_buffer_acres(nrcs_buffers), "data/processed/nwi_buffer_acres_LE_2ft_3in_12in_ft_nd.csv")
+saveRDS(union_wet_buf(nrcs_buffers), "data/processed/nwi_wet_buf_LE_2ft_3in_12in_ft_nd.rds")
+
 # all LE distances:
 # for (v in le_vars) {
 #   b <- get_wetland_buffers(v)
