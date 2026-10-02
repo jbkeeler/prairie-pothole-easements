@@ -33,6 +33,14 @@ nwi_ease$wet_acres <- as.numeric(st_area(nwi_ease)) / 4046.8564224
 
 saveRDS(nwi_ease, "data/processed/nwi_tracts_nd.rds")
 
+# basin size: a basin is one NWI polygon within one tract (multi-part pieces summed)
+basins <- as.data.table(st_drop_geometry(nwi_ease))[
+  , .(acres = sum(wet_acres)), by = .(NWI_ID, tract_uid)]
+small <- basins$acres < 1
+cat(sprintf("Basins under 1 acre: %s of %s (%.1f%%), %.1f%% of wetland acres\n",
+            comma(sum(small)), comma(nrow(basins)), 100 * mean(small),
+            100 * sum(basins$acres[small]) / sum(basins$acres)))
+
 
 
 
