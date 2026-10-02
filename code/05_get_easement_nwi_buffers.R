@@ -156,81 +156,114 @@ saveRDS(union_wet_buf(nrcs_buffers), "data/processed/nwi_wet_buf_LE_2ft_3in_12in
 # }
 
 
-# example tract map: easement, wetlands, FWS and NRCS setbacks, and crops
+# example tract maps: easement, wetlands, FWS and NRCS setbacks, and crops
 # MEMO: Figure "Easement Tract 112X: Wetlands and 180 ft Setback Buffer"
 #       (fig:tract_buffer). The text's numbers for this tract (22.7 wetland ac,
 #       76.6 setback ac, 99 ac / 62% of the 160-ac tract) are in ex_ac
 #       (wet_acres, buffer_acres, wet_buf_acres, wet_buf_share, tract_acres);
 #       the plot subtitle prints the totals.
-ex_uid  <- 101   # TRACTNO 112X; 160 ac, 20 wetland polygons, 180 ft setback
+# TRACTNO repeats across WMDs, so pick tracts by tract_uid
+ex_uids <- c(101, 11948, 11179)   # TRACTNO 112X (Valley City), 197X and 17X (Tewaukon)
 ex_year <- 2025
 
-ex_tract <- fws_tracts_nd[fws_tracts_nd$tract_uid == ex_uid, ]
-ex_wet   <- nwi_buffers[nwi_buffers$tract_uid == ex_uid & nwi_buffers$zone == "wetland", ]
-ex_ac    <- nwi_buffer_acres[tract_uid == ex_uid]
-ex_ac_nrcs <- tract_buffer_acres(nrcs_buffers)[tract_uid == ex_uid]
-
-# wetland + setback outline for each standard
-ex_setbacks <- rbind(
-  st_sf(standard = sprintf("FWS setback (%s ft)", ex_ac$buffer_ft),
-        geometry = st_union(nwi_buffers[nwi_buffers$tract_uid == ex_uid, ])),
-  st_sf(standard = sprintf("NRCS setback (%s ft)", ex_ac_nrcs$buffer_ft),
-        geometry = st_union(nrcs_buffers[nrcs_buffers$tract_uid == ex_uid, ]))
-)
-ex_setbacks$standard <- factor(ex_setbacks$standard, levels = ex_setbacks$standard)
+nrcs_buffer_acres <- tract_buffer_acres(nrcs_buffers)
 
 # CDL crops on the tract; same non-crop classes dropped as in step 06
 cdl_legend <- readRDS("data/processed/cdl_legend.rds")
 drop_ids   <- c(61,81:83,87,88,92,111,112,121:124,131,141:143,152,176,190,195)
+cdl_ex_year <- rast(file.path("data/raw/CDL", paste0(ex_year, "_30m_cdls.tif")))
 
-ex_cdl <- rast(file.path("data/raw/CDL", paste0(ex_year, "_30m_cdls.tif"))) |>
-  crop(ex_tract, mask = TRUE, touches = FALSE)
-ex_cdl <- ifel(ex_cdl %in% drop_ids, NA, ex_cdl)
+setback_levels <- c("FWS setback", "NRCS setback")
 
-cell_ac <- prod(res(ex_cdl)) / 4046.8564224
+ex_data <- lapply(ex_uids, function(uid) {
+  tract <- fws_tracts_nd[fws_tracts_nd$tract_uid == uid, ]
+  ac      <- nwi_buffer_acres[tract_uid == uid]
+  ac_nrcs <- nrcs_buffer_acres[tract_uid == uid]
 
-# cropped acres inside each standard's wetland + setback area
-ex_crop_ac <- sapply(seq_len(nrow(ex_setbacks)), function(i) {
-  sum(!is.na(values(mask(ex_cdl, vect(ex_setbacks[i, ]), touches = FALSE)))) * cell_ac
+  # wetland + setback outline for each standard
+  setbacks <- rbind(
+    st_sf(standard = "FWS setback",
+          geometry = st_union(nwi_buffers[nwi_buffers$tract_uid == uid, ])),
+    st_sf(standard = "NRCS setback",
+          geometry = st_union(nrcs_buffers[nrcs_buffers$tract_uid == uid, ]))
+  )
+  setbacks$standard <- factor(setbacks$standard, levels = setback_levels)
+
+  cdl <- crop(cdl_ex_year, tract, mask = TRUE, touches = FALSE)
+  cdl <- ifel(cdl %in% drop_ids, NA, cdl)
+  # stray Other Hay/Non Alfalfa (37) pixel in 11179
+  if (uid == 11179) cdl <- ifel(cdl == 37, NA, cdl)
+  # cropped share of wetland + FWS setback, the same measure as the memo's acreage table
+  wet_fws <- setbacks[setbacks$standard == "FWS setback", ]
+  crop_ac <- sum(!is.na(values(mask(cdl, vect(wet_fws), touches = FALSE)))) *
+    prod(res(cdl)) / 4046.8564224
+  crop_pct <- 100 * crop_ac / (as.numeric(st_area(wet_fws)) / 4046.8564224)
+
+  cdl_df <- as.data.frame(cdl, xy = TRUE, na.rm = TRUE) |>
+    setNames(c("x", "y", "code")) |>
+    as.data.table()
+  cdl_df <- merge(cdl_df, cdl_legend[, .(code, class_name, colorhex)], by = "code")
+
+  # shares of the tract; FWS and NRCS setback rings measured separately
+  pct <- function(x) 100 * x / ac$tract_acres
+  subtitle <- sprintf(paste0("Wetland %.0f%%\n",
+                             "FWS setback %s ft: %.0f%%\n",
+                             "NRCS setback %s ft: %.0f%%\n",
+                             "Cropped: %.0f%% of wetland + FWS setback"),
+                      pct(ac$wet_acres),
+                      ac$buffer_ft, pct(ac$buffer_acres),
+                      ac_nrcs$buffer_ft, pct(ac_nrcs$buffer_acres),
+                      crop_pct)
+
+  list(tract = tract,
+       wet = nwi_buffers[nwi_buffers$tract_uid == uid & nwi_buffers$zone == "wetland", ],
+       setbacks = setbacks, cdl_df = cdl_df, subtitle = subtitle)
 })
 
-ex_cdl_df <- as.data.frame(ex_cdl, xy = TRUE, na.rm = TRUE) |>
-  setNames(c("x", "y", "code")) |>
-  as.data.table()
-ex_cdl_df <- merge(ex_cdl_df, cdl_legend[, .(code, class_name, colorhex)], by = "code")
-
-crop_colors <- unique(ex_cdl_df[, .(class_name, colorhex)])
-crop_colors <- setNames(crop_colors$colorhex, crop_colors$class_name)
+# one fill scale across panels so the crop legend can be collected
+crop_colors <- unique(rbindlist(lapply(ex_data, `[[`, "cdl_df"))[, .(class_name, colorhex)])
+# alpha set in the palette, not the layer, so legend keys match the map
+crop_colors <- setNames(alpha(crop_colors$colorhex, 0.55), crop_colors$class_name)
 fill_colors <- c(crop_colors, "NWI wetland" = "#688CC0")
 
-p_ex <- ggplot() +
-  geom_sf(data = ex_tract, fill = "grey92", color = NA) +
-  geom_raster(data = ex_cdl_df, aes(x, y, fill = class_name), alpha = 0.55) +
-  geom_sf(data = ex_wet, aes(fill = "NWI wetland"), color = NA) +
-  geom_sf(data = ex_setbacks, aes(color = standard, linetype = standard),
-          fill = NA, linewidth = 0.8) +
-  geom_sf(data = ex_tract, fill = NA, color = "grey20", linewidth = 0.6) +
-  scale_fill_manual(values = fill_colors,
-                    breaks = c(names(crop_colors), "NWI wetland"),
-                    name = NULL) +
-  scale_color_manual(values = c("#B2582B", NDSU_COLORS[["ndsu_night"]]), name = NULL) +
-  scale_linetype_manual(values = c("solid", "22"), name = NULL) +
-  coord_sf(datum = NA) +
-  labs(title = paste0("Easement tract ", ex_ac$TRACTNO, ": wetlands, setbacks, and ",
-                      ex_year, " crops"),
-       subtitle = sprintf(paste0("FWS: wetland + setback %.1f ac (%.0f%% of %.1f ac tract), %.1f ac cropped\n",
-                                 "NRCS: wetland + setback %.1f ac (%.0f%% of tract), %.1f ac cropped"),
-                          ex_ac$wet_buf_acres, 100 * ex_ac$wet_buf_share, ex_ac$tract_acres,
-                          ex_crop_ac[1],
-                          ex_ac_nrcs$wet_buf_acres, 100 * ex_ac_nrcs$wet_buf_share,
-                          ex_crop_ac[2]),
-       caption = paste0("Grey: easement land not in crops. Outlines enclose wetlands plus setback.\n",
-                        "Source: USFWS NWI, USFWS realty tracts, USDA NASS CDL, lateral effect distances.")) +
-  theme_void() +
+plot_ex_tract <- function(d) {
+  ggplot() +
+    geom_sf(data = d$tract, fill = "grey92", color = NA) +
+    geom_raster(data = d$cdl_df, aes(x, y, fill = class_name),
+                show.legend = c(fill = TRUE)) +   # draw every fill key so patchwork collects one legend
+    geom_sf(data = d$wet, aes(fill = "NWI wetland"), color = NA, show.legend = FALSE) +
+    geom_sf(data = d$setbacks, aes(color = standard, linetype = standard),
+            fill = NA, linewidth = 0.6) +
+    geom_sf(data = d$tract, fill = NA, color = "grey20", linewidth = 0.5) +
+    scale_fill_manual(values = fill_colors,
+                      breaks = c(names(crop_colors), "NWI wetland"),
+                      limits = names(fill_colors),
+                      name = NULL) +
+    scale_color_manual(values = setNames(c("#B2582B", NDSU_COLORS[["ndsu_night"]]), setback_levels),
+                       limits = setback_levels, name = NULL) +
+    scale_linetype_manual(values = setNames(c("solid", "22"), setback_levels),
+                          limits = setback_levels, name = NULL) +
+    guides(color = guide_legend(override.aes = list(fill = NA))) +
+    coord_sf(datum = NA) +
+    labs(subtitle = d$subtitle) +
+    theme_void() +
+    theme(plot.subtitle = element_text(size = 8.5, lineheight = 1.1,
+                                       margin = margin(t = 2, b = 6)))
+}
+
+p_ex <- patchwork::wrap_plots(lapply(ex_data, plot_ex_tract), nrow = 1) +
+  patchwork::plot_layout(guides = "collect") +
+  patchwork::plot_annotation(
+    caption = paste0("Wetland and setback percentages are shares of tract acres; setback shares exclude the wetland itself.\n",
+                     "Cropped share is of the wetland + FWS setback area, from the ", ex_year, " CDL.\n",
+                     "Grey: easement land not in crops. Outlines enclose wetlands plus setback.\n",
+                     "Source: USFWS NWI, USFWS realty tracts, USDA NASS CDL, lateral effect distances."),
+    theme = theme(plot.caption = element_text(size = 8, hjust = 0))
+  ) &
   theme(legend.position = "bottom",
         legend.box = "vertical",
-        plot.title = element_blank(),
-        plot.margin = margin(10, 10, 10, 10))
+        legend.text = element_text(size = 8),
+        plot.margin = margin(6, 6, 6, 6))
 
 ggsave("figures/example_tract_nwi_buffer.pdf", p_ex,
-       width = 7, height = 7.5, device = cairo_pdf, bg = "white")
+       width = 9, height = 4.8, device = cairo_pdf, bg = "white")
