@@ -1,16 +1,39 @@
+# Step 05: wetland + setback buffer polygons within each easement tract, under
+# the FWS-approximation (1.2 in drawdown) and NRCS (12 in drawdown) setbacks.
+#
+# In:  data/processed/fws_tracts_nd.rds (step 01)
+#      data/processed/nwi_tracts_nd.rds (step 03)
+#      data/processed/LateralEffect_Tract_LE.csv (external, from step 04's soils)
+#      data/processed/cdl_legend.rds (step 02), data/raw/CDL/2025_30m_cdls.tif
+# Out: data/processed/nwi_buffers_<LE>_nd.rds      wetland and buffer-ring polygons
+#      data/processed/nwi_buffer_acres_<LE>_nd.csv  per-tract acres
+#      data/processed/nwi_wet_buf_<LE>_nd.rds       wetland + buffer, one polygon per
+#                                                   tract (used by step 06)
+#      figures/example_tract_nwi_buffer.pdf
+#   where <LE> is LE_2ft_3in_1p2in_ft (FWS) or LE_2ft_3in_12in_ft (NRCS)
+#
+# MEMO: Table "Acreage Measures" (hand-entered in arpc-memo.tex) rows for
+#       NWI wetlands inside easement tracts, setback buffer, and wetlands plus
+#       setback buffer under each standard are column sums of
+#       nwi_buffer_acres_<LE>_nd.csv (wet_acres, buffer_acres, wet_buf_acres).
+#       The same totals give the 4.0M / 2.3M acre figures in Key Insights.
+# MEMO: Key Insights "about 27% of tracts" fully covered by wetlands plus FWS
+#       setbacks is the share of tracts with wet_buf_share ~ 1 in the FWS CSV
+#       (computed by hand, not in this script).
+
 rm(list = ls())
 gc()
 
-source("code/00_master.R")
+source("code/setup.R")
 
 
 fws_tracts_nd <- readRDS("data/processed/fws_tracts_nd.rds") |>
   st_transform(5070)
 
-# row id, since the first tract column has duplicates; matches get_ND_gSSURGO.R
+# row id, since the first tract column has duplicates; matches steps 03 and 04
 fws_tracts_nd$tract_uid <- seq_len(nrow(fws_tracts_nd))
 
-# wetland x tract pieces from get_easement_NWI.R (already clipped to tracts, EPSG:5070)
+# wetland x tract pieces from step 03 (already clipped to tracts, EPSG:5070)
 nwi_ease <- readRDS("data/processed/nwi_tracts_nd.rds")
 
 # lateral effect setback distances (ft) by tract_uid; NA where the soil has no LE
@@ -95,6 +118,7 @@ tract_buffer_acres <- function(buffers) {
 
 nwi_buffer_acres <- tract_buffer_acres(nwi_buffers)
 
+# MEMO: source of the FWS-standard rows in the "Acreage Measures" table
 fwrite(nwi_buffer_acres, "data/processed/nwi_buffer_acres_LE_2ft_3in_1p2in_ft_nd.csv")
 
 
@@ -116,6 +140,8 @@ nwi_wet_buf <- union_wet_buf(nwi_buffers)
 saveRDS(nwi_wet_buf, "data/processed/nwi_wet_buf_LE_2ft_3in_1p2in_ft_nd.rds")
 
 # NRCS standard (12 in drawdown), same tile design, for the memo's acreage range
+# MEMO: the NRCS acreage CSV is the source of the NRCS-standard rows in the
+#       "Acreage Measures" table
 nrcs_buffers <- get_wetland_buffers("LE_2ft_3in_12in_ft")
 saveRDS(nrcs_buffers, "data/processed/nwi_buffers_LE_2ft_3in_12in_ft_nd.rds")
 fwrite(tract_buffer_acres(nrcs_buffers), "data/processed/nwi_buffer_acres_LE_2ft_3in_12in_ft_nd.csv")
@@ -131,6 +157,11 @@ saveRDS(union_wet_buf(nrcs_buffers), "data/processed/nwi_wet_buf_LE_2ft_3in_12in
 
 
 # example tract map: easement, wetlands, FWS and NRCS setbacks, and crops
+# MEMO: Figure "Easement Tract 112X: Wetlands and 180 ft Setback Buffer"
+#       (fig:tract_buffer). The text's numbers for this tract (22.7 wetland ac,
+#       76.6 setback ac, 99 ac / 62% of the 160-ac tract) are in ex_ac
+#       (wet_acres, buffer_acres, wet_buf_acres, wet_buf_share, tract_acres);
+#       the plot subtitle prints the totals.
 ex_uid  <- 101   # TRACTNO 112X; 160 ac, 20 wetland polygons, 180 ft setback
 ex_year <- 2025
 
@@ -148,7 +179,7 @@ ex_setbacks <- rbind(
 )
 ex_setbacks$standard <- factor(ex_setbacks$standard, levels = ex_setbacks$standard)
 
-# CDL crops on the tract; same non-crop classes dropped as in get_easement_CDL.R
+# CDL crops on the tract; same non-crop classes dropped as in step 06
 cdl_legend <- readRDS("data/processed/cdl_legend.rds")
 drop_ids   <- c(61,81:83,87,88,92,111,112,121:124,131,141:143,152,176,190,195)
 

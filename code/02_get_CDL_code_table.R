@@ -1,3 +1,14 @@
+# Step 02: Cropland Data Layer legend (code, class name, colors).
+#
+# In:  NASS CDL legend web page (scraped)
+# Out: data/processed/cdl_legend.rds   used by steps 05 and 06 to name and color
+#                                     CDL classes
+
+rm(list = ls())
+gc()
+
+source("code/setup.R")
+
 library(rvest)
 
 url <- "https://www.nass.usda.gov/Research_and_Science/Cropland/docs/cdl_legend_colors.html"

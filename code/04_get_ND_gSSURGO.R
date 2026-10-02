@@ -1,7 +1,27 @@
+# Step 04: gSSURGO soils on each easement tract, split into wetland and
+# non-wetland (field) parts.
+#
+# In:  data/processed/fws_tracts_nd.rds (step 01)
+#      data/processed/nwi_tracts_nd.rds (step 03)
+#      data/raw/gSSURGO_ND.gdb
+# Out: data/processed/gssurgo_tract_mukey_nd.rds, gssurgo_tract_soils_nd.rds,
+#      gssurgo_tract_lcc_nd.rds
+#      data/processed/gssurgo_tract_dom_soils_nd.csv   dominant field and wetland
+#        map units per tract; the input to the external lateral effect
+#        calculation that produces LateralEffect_Tract_LE.csv (see 00_master.R)
+#      figures/stutsman_easement_hydric.pdf  (not used in the memo)
+#
+# MEMO: "Drain Tile Setbacks" section: the dominant field and wetland soil types
+#       used to compute each tract's setback come from the CSV written here.
+#       The setback distances themselves (tables/setback_county.tex, the 160 ft
+#       vs 70 ft medians, the 32% vs 1.4% of tracts over 500 ft, the ~300 tracts
+#       with missing soil data) come from LateralEffect_Tract_LE.csv, and no
+#       script in this repo builds that table or those numbers.
+
 rm(list = ls())
 gc()
 
-source("code/00_master.R")
+source("code/setup.R")
 
 states <- states(cb = FALSE, year = 2024)
 
@@ -37,7 +57,7 @@ fws_tracts_nd$tract_uid <- seq_len(nrow(fws_tracts_nd))
 # GISACRES is 0 for every tract, so use polygon area
 fws_tracts_nd$poly_acres <- as.numeric(st_area(fws_tracts_nd)) / 4046.8564224
 
-# NWI wetland x tract polygons from get_easement_NWI.R (same tract_uid)
+# NWI wetland x tract polygons from step 03 (same tract_uid)
 nwi_ease <- readRDS("data/processed/nwi_tracts_nd.rds")
 
 mu_r    <- crop(mu_r, vect(fws_tracts_nd))
@@ -114,6 +134,7 @@ saveRDS(tract_soils, "data/processed/gssurgo_tract_soils_nd.rds")
 saveRDS(tract_lcc,   "data/processed/gssurgo_tract_lcc_nd.rds")
 
 
+# input to the external lateral effect (setback) calculation
 write.csv(tract_soils[, .(tract_uid, county_fips, county_name, dom_mukey, dom_mu_acres, dom_musym, dom_muname,
                           wet_acres, wet_dom_mukey, wet_dom_mu_acres, wet_dom_musym, wet_dom_muname,
                           nonwet_acres, nonwet_dom_mukey, nonwet_dom_mu_acres, nonwet_dom_musym, nonwet_dom_muname)],
@@ -121,6 +142,7 @@ write.csv(tract_soils[, .(tract_uid, county_fips, county_name, dom_mukey, dom_mu
 
 
 
+# Stutsman County hydric soils map (not used in the memo)
 stutsman <- nd_cnties[nd_cnties$COUNTYFP == "093",] |>
   st_transform(5070)
 

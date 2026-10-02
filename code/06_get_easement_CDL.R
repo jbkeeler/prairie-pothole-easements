@@ -1,7 +1,30 @@
+# Step 06: cropped acres inside wetlands + setbacks (CDL 2021-2025), and their
+# value at county cash rents, land values, and gross crop revenue.
+#
+# In:  data/processed/nwi_wet_buf_LE_2ft_3in_1p2in_ft_nd.rds (step 05, FWS)
+#      data/processed/nwi_wet_buf_LE_2ft_3in_12in_ft_nd.rds  (step 05, NRCS)
+#      data/processed/cdl_legend.rds (step 02), data/raw/CDL/<year>_30m_cdls.tif
+#      data/processed/NDcountyRents_prices2026.xlsx (ND Dept. of Trust Lands)
+#      NASS Quick Stats API (needs NASSQS_TOKEN set in the environment)
+# Out: data/processed/cdl_tract_buf_acres_nd.rds                 FWS, county x crop x year
+#      data/processed/cdl_tract_buf_acres_LE_2ft_3in_12in_ft_nd.rds  NRCS
+#      data/processed/crop_revenue_per_acre_nd.rds, tract_buf_crop_revenue_nd.rds,
+#      tract_buf_cropland_rents_nd.rds
+#      tables/revenue_summary_crop_mean.tex, tables/cropland_rent_summary_year.tex
+#      figures/stutsman_easement_cdl.pdf  (not used in the memo)
+#
+# MEMO: "Acreage Measures" table rows for cropped acres inside wetlands plus
+#       setbacks (1.57M FWS, 0.62M NRCS, 2021-2025 average) are hand-entered
+#       from the two cdl_tract_buf_acres*.rds files (mean over years of summed
+#       acres).
+# MEMO: "Potential Lost Returns" uses the FWS-standard tables built here. The
+#       NRCS-standard figures in the text ($41M rent, $1.5B land value, $200M
+#       revenue) are not computed here: this script only tabulates NRCS acres.
+
 rm(list = ls())
 gc()
 
-source("code/00_master.R")
+source("code/setup.R")
 
 
 states <- states(cb = FALSE, year = 2024)
@@ -69,8 +92,10 @@ get_county_CDL_acreage <- function(y,poly){
 tract_buf_tab <- lapply(years, get_county_CDL_acreage, poly = tract_buffers) |>
   rbindlist()
 
+# MEMO: cropped acres inside wetlands plus FWS setbacks (1.57M ac average)
 saveRDS(tract_buf_tab, "data/processed/cdl_tract_buf_acres_nd.rds")
 
+# MEMO: cropped acres inside wetlands plus NRCS setbacks (0.62M ac average)
 # cropped acres under NRCS-standard setbacks, for the memo's acreage range
 nrcs_buffers <- readRDS("data/processed/nwi_wet_buf_LE_2ft_3in_12in_ft_nd.rds") |>
   st_transform(5070)
@@ -79,6 +104,7 @@ nrcs_buf_tab <- lapply(years, get_county_CDL_acreage, poly = nrcs_buffers) |>
 saveRDS(nrcs_buf_tab, "data/processed/cdl_tract_buf_acres_LE_2ft_3in_12in_ft_nd.rds")
 
 
+# Stutsman County 2025 crop map (not used in the memo)
 y <- 2025
 cdl <- rast(file.path("data/raw/CDL",paste0(y,"_30m_cdls.tif")))
 
@@ -493,6 +519,7 @@ crop_revenue[, yield_source := fcase(!is.na(cnty_yield), "county",
 crop_revenue <- prices[, .(class_name, year, price = Value, price_unit)][crop_revenue, on = .(class_name, year)]
 crop_revenue <- unique(yields[, .(class_name, yield_unit)])[crop_revenue, on = "class_name"]
 
+# MEMO: the 15% yield discount for wetland ground (Boldt et al., 2025)
 wetland_discount_factor <- 0.85
 
 crop_revenue[, revenue_per_acre := price * yield * wetland_discount_factor]
@@ -555,6 +582,10 @@ revenue_summary_crop_mean <- revenue_summary_crop_year[, .(mean_revenue = sum(to
   order(class_name == "Total", -mean_revenue)]
 revenue_summary_crop_mean[, mean_revenue_fmt := label_dollar()(mean_revenue)]
 
+# MEMO: Table "Mean Crop Revenue (2021--2025) for Acreage Within FWS Buffers"
+#       (tab:revenue_crop_mean). The text's $509M per year comes from its Total
+#       row. The text's ~$330 per cropped acre and the 87% share for soybeans,
+#       corn, spring wheat, and canola are derived from it by hand.
 spec1 <- "L{2.8cm} R{2.6cm}"
 
 labs1 <- c("Crop", "Mean Annual Revenue")
@@ -621,6 +652,9 @@ rent_summary_year_tex <- rent_summary_year[, .(
   total_land_value    = label_dollar(prefix = "\\$")(total_land_value)
 )]
 
+# MEMO: Table "Cropland Cash Rent and Land Value for Acreage Within FWS
+#       Buffers" (tab:cropland_rent_year). The text's $102M per year, $65 per
+#       acre, $3.8B, and $2,400 per acre come from its Average row.
 spec2 <- "L{1.3cm} R{1.5cm} R{1.5cm} R{2.1cm} R{1.7cm} R{2.5cm}"
 
 labs2 <- c("Year", "Cropped Acres", "Rent per Acre", "Total Cash Rent",

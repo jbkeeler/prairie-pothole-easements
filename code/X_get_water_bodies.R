@@ -1,7 +1,7 @@
 rm(list = ls())
 gc()
 
-source("code/00_master.R")
+source("code/setup.R")
 
 
 states <- states(cb = FALSE, year = 2024)

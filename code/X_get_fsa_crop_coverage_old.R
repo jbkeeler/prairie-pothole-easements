@@ -3,7 +3,7 @@
 rm(list = ls())
 gc()
 
-source("code/00_master.R")
+source("code/setup.R")
 
 
 fsa_clu_nd_geometry_file <-  "D:/data/processed/FSA/clu/state/ND/fy25_geometry.rds"

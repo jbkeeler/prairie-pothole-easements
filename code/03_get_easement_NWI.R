@@ -1,7 +1,22 @@
+# Step 03: NWI wetlands inside FWS easement tracts.
+#
+# In:  data/processed/fws_tracts_nd.rds (step 01)
+#      data/raw/NWI/ND_geopackage_wetlands.gpkg
+# Out: data/processed/nwi_tracts_nd.rds   NWI wetland x tract polygons, EPSG:5070,
+#                                        used by steps 04 and 05
+#      figures/stutsman_easement_nwi.pdf  (not used in the memo)
+#
+# MEMO: "NWI wetlands inside easement tracts" in the acreage table is the sum of
+#       wet_acres in nwi_tracts_nd.rds (hand-entered; step 05's buffer acreage
+#       CSV gives the same total over tracts with setbacks).
+# MEMO: The memo's NWI maps (figures/nd_nwi_system.png,
+#       figures/stutsman_easement_nwi_system.png) and the statewide NWI total
+#       (4.23M ac) are not produced by any script in this repo.
+
 rm(list = ls())
 gc()
 
-source("code/00_master.R")
+source("code/setup.R")
 
 
 nd_cnties <- counties(state = "ND", year = 2024) |>
@@ -10,7 +25,7 @@ nd_cnties <- counties(state = "ND", year = 2024) |>
 fws_tracts_nd <- readRDS("data/processed/fws_tracts_nd.rds") |>
   st_transform(5070)
 
-# row id, since the first tract column has duplicates; matches get_ND_gSSURGO.R
+# row id, since the first tract column has duplicates; matches steps 04 and 05
 fws_tracts_nd$tract_uid <- seq_len(nrow(fws_tracts_nd))
 
 # st_layers("data/raw/NWI/ND_geopackage_wetlands.gpkg")
@@ -33,6 +48,8 @@ nwi_ease$wet_acres <- as.numeric(st_area(nwi_ease)) / 4046.8564224
 
 saveRDS(nwi_ease, "data/processed/nwi_tracts_nd.rds")
 
+# MEMO: Key Insights "Most wetland basins are small": share of basins under
+#       1 acre (~3 in 4) and their share of wetland acres (~14%), printed below.
 # basin size: a basin is one NWI polygon within one tract (multi-part pieces summed)
 basins <- as.data.table(st_drop_geometry(nwi_ease))[
   , .(acres = sum(wet_acres)), by = .(NWI_ID, tract_uid)]
@@ -42,17 +59,8 @@ cat(sprintf("Basins under 1 acre: %s of %s (%.1f%%), %.1f%% of wetland acres\n",
             100 * sum(basins$acres[small]) / sum(basins$acres)))
 
 
-
-
-
-
-ease_buffers <- read.csv("data/processed/LateralEffect_Tract_LE.csv")
-
-
-
-
-
-
+# Stutsman County example map (not used in the memo; the memo's Stutsman
+# figure is stutsman_easement_nwi_system.png, made outside this repo)
 stutsman <- nd_cnties[nd_cnties$COUNTYFP == "093",] |>
   st_transform(5070)
 
