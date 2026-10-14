@@ -189,30 +189,29 @@ saveRDS(tract_mupoly, "data/processed/gssurgo_tract_mupoly_nd.rds")
 
 
 # input to the external lateral effect (setback) calculation: one row per
-# county x wetland soil x field soil that occurs together in a tract. The wetland
-# soils are the basins' dominant map units; the field soils are every map unit
-# polygon in the tract, so each piece step 05 buffers has a distance.
-# Column names follow the earlier one-row-per-tract file. There the calculator's
-# distances tracked dom_mukey (the tract's dominant soil, wetland or not) rather
-# than nonwet_dom_mukey, so the field soil is written to both sets of columns.
-tract_wet_soils   <- unique(basin_soils[!is.na(wet_mukey), .(tract_uid, wet_dom_mukey = wet_mukey)])
-tract_field_soils <- as.data.table(st_drop_geometry(tract_mupoly))[, .(tract_uid, nonwet_dom_mukey = mukey)]
+# county x wetland soil x field soil that occurs together in a tract. wet_* is a
+# basin's dominant map unit; field_* is any map unit in the same tract (wetland
+# or not), so each piece step 05 buffers has a distance. A field soil can match
+# the wetland soil, since the basin's map unit usually extends past the basin.
+# Rows are unique pairs within a county; dropping county would only remove ~1%,
+# since map units rarely cross survey areas.
+tract_wet_soils   <- unique(basin_soils[!is.na(wet_mukey), .(tract_uid, wet_mukey)])
+tract_field_soils <- as.data.table(st_drop_geometry(tract_mupoly))[, .(tract_uid, field_mukey = mukey)]
 
 soil_pairs <- merge(tract_wet_soils, tract_field_soils, by = "tract_uid", allow.cartesian = TRUE)
 soil_pairs <- merge(soil_pairs, tract_cnty, by = "tract_uid")
-soil_pairs <- unique(soil_pairs[, .(county_fips, county_name, wet_dom_mukey, nonwet_dom_mukey)])
+soil_pairs <- unique(soil_pairs[, .(county_fips, county_name, wet_mukey, field_mukey)])
 
 mu_names <- mapunit[, .(mukey, musym, muname)]
-soil_pairs <- merge(soil_pairs, setNames(mu_names, c("wet_dom_mukey", "wet_dom_musym", "wet_dom_muname")),
-                    by = "wet_dom_mukey", all.x = TRUE)
-soil_pairs <- merge(soil_pairs, setNames(mu_names, c("nonwet_dom_mukey", "nonwet_dom_musym", "nonwet_dom_muname")),
-                    by = "nonwet_dom_mukey", all.x = TRUE)
-soil_pairs[, `:=`(dom_mukey = nonwet_dom_mukey, dom_musym = nonwet_dom_musym, dom_muname = nonwet_dom_muname)]
-setorder(soil_pairs, county_fips, wet_dom_mukey, nonwet_dom_mukey)
+soil_pairs <- merge(soil_pairs, setNames(mu_names, c("wet_mukey", "wet_musym", "wet_muname")),
+                    by = "wet_mukey", all.x = TRUE)
+soil_pairs <- merge(soil_pairs, setNames(mu_names, c("field_mukey", "field_musym", "field_muname")),
+                    by = "field_mukey", all.x = TRUE)
+setorder(soil_pairs, county_fips, wet_mukey, field_mukey)
 
-write.csv(soil_pairs[, .(county_fips, county_name, dom_mukey, dom_musym, dom_muname,
-                         wet_dom_mukey, wet_dom_musym, wet_dom_muname,
-                         nonwet_dom_mukey, nonwet_dom_musym, nonwet_dom_muname)],
+write.csv(soil_pairs[, .(county_fips, county_name,
+                         wet_mukey, wet_musym, wet_muname,
+                         field_mukey, field_musym, field_muname)],
           "data/processed/gssurgo_soil_pairs_nd.csv", row.names = FALSE)
 
 

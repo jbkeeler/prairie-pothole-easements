@@ -28,8 +28,8 @@ steps <- c(
   # from step 04 is run through the NRCS van Schilfgaarde lateral effect
   # calculation to produce data/processed/LateralEffect_Soils_LE.csv (setback
   # distances by county x wetland soil x field soil under the NRCS and FWS
-  # drawdown assumptions, keeping the county_fips, wet_dom_mukey and
-  # nonwet_dom_mukey columns). Steps 05-06 need that file.
+  # drawdown assumptions, keeping the county_fips, wet_mukey and field_mukey
+  # columns). Steps 05-06 need that file.
 
   "code/05_get_easement_nwi_buffers.R", # wetland + setback buffers; example tract figure
   "code/06_get_easement_CDL.R"          # cropped acres, revenue, and rent tables

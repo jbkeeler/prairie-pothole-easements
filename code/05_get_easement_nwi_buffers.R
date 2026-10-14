@@ -54,7 +54,7 @@ st_agr(tract_mupoly) <- "constant"   # no per-tract warnings when clipping
 # lateral effect setback distances (ft) for each county x wetland soil x field
 # soil; NA where the pair has no LE
 ease_buffers <- fread("data/processed/LateralEffect_Soils_LE.csv")
-setnames(ease_buffers, c("wet_dom_mukey", "nonwet_dom_mukey"), c("wet_mukey", "mukey"))
+setnames(ease_buffers, "field_mukey", "mukey")
 ease_buffers[, county_fips := as.integer(county_fips)]
 stopifnot(!anyDuplicated(ease_buffers[, .(county_fips, wet_mukey, mukey)]))
 
