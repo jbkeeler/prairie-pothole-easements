@@ -1,11 +1,16 @@
 # Step 05: wetland + setback buffer polygons within each easement tract, under
 # the FWS-approximation (1.2 in drawdown) and NRCS (12 in drawdown) setbacks.
+# The setback distance varies within a tract: each field soil gets the distance
+# for that soil paired with the soil of the wetland basin it is measured from.
 #
 # In:  data/processed/fws_tracts_nd.rds (step 01)
 #      data/processed/nwi_tracts_nd.rds (step 03)
-#      data/processed/LateralEffect_Tract_LE.csv (external, from step 04's soils)
+#      data/processed/nwi_basin_soils_nd.rds, gssurgo_tract_mupoly_nd.rds (step 04)
+#      data/processed/LateralEffect_Soils_LE.csv (external, from step 04's soil pairs)
 #      data/processed/cdl_legend.rds (step 02), data/raw/CDL/2025_30m_cdls.tif
-# Out: data/processed/nwi_buffers_<LE>_nd.rds      wetland and buffer-ring polygons
+# Out: data/processed/nwi_buffers_<LE>_nd.rds      wetland polygons (one per tract)
+#                                                   and buffer-ring polygons (one
+#                                                   per tract x field soil)
 #      data/processed/nwi_buffer_acres_<LE>_nd.csv  per-tract acres
 #      data/processed/nwi_wet_buf_<LE>_nd.rds       wetland + buffer, one polygon per
 #                                                   tract (used by step 06)
@@ -36,64 +41,113 @@ fws_tracts_nd$tract_uid <- seq_len(nrow(fws_tracts_nd))
 # wetland x tract pieces from step 03 (already clipped to tracts, EPSG:5070)
 nwi_ease <- readRDS("data/processed/nwi_tracts_nd.rds")
 
-# lateral effect setback distances (ft) by tract_uid; NA where the soil has no LE
-ease_buffers <- fread("data/processed/LateralEffect_Tract_LE.csv")
+# dominant map unit of each wetland basin from step 04; basin_uid is the row of nwi_ease
+basin_soils <- readRDS("data/processed/nwi_basin_soils_nd.rds")
+nwi_ease$wet_mukey <- basin_soils$wet_mukey[match(seq_len(nrow(nwi_ease)), basin_soils$basin_uid)]
+
+# map unit polygons clipped to tracts, one (multi)polygon per tract x map unit,
+# with the tract's county
+tract_mupoly <- readRDS("data/processed/gssurgo_tract_mupoly_nd.rds")
+tract_mupoly$county_fips <- as.integer(tract_mupoly$county_fips)
+st_agr(tract_mupoly) <- "constant"   # no per-tract warnings when clipping
+
+# lateral effect setback distances (ft) for each county x wetland soil x field
+# soil; NA where the pair has no LE
+ease_buffers <- fread("data/processed/LateralEffect_Soils_LE.csv")
+setnames(ease_buffers, c("wet_dom_mukey", "nonwet_dom_mukey"), c("wet_mukey", "mukey"))
+ease_buffers[, county_fips := as.integer(county_fips)]
+stopifnot(!anyDuplicated(ease_buffers[, .(county_fips, wet_mukey, mukey)]))
 
 le_vars <- grep("^LE_", names(ease_buffers), value = TRUE)
 
 
-# one (multi)polygon of all NWI wetland per tract
-nwi_tract <- aggregate(vect(nwi_ease[, "tract_uid"]), by = "tract_uid") |>
-  st_as_sf()
-nwi_tract <- st_cast(nwi_tract[, "tract_uid"], "MULTIPOLYGON", warn = FALSE)
+# (multi)polygons of NWI wetland dissolved by the given columns
+dissolve_wetlands <- function(x, by) {
+  u <- aggregate(vect(x[, by]), by = by) |>
+    st_as_sf()
+  st_cast(u[, by], "MULTIPOLYGON", warn = FALSE)
+}
+
+# all NWI wetland per tract, and per tract x wetland soil (the setback source);
+# basins without a map unit are wetland but get no setback
+nwi_tract      <- dissolve_wetlands(nwi_ease, "tract_uid")
+nwi_tract_soil <- dissolve_wetlands(nwi_ease[!is.na(nwi_ease$wet_mukey), ], c("tract_uid", "wet_mukey"))
+
+# rows of each tract, for the per-tract loop
+wet_rows  <- split(seq_len(nrow(nwi_tract_soil)), nwi_tract_soil$tract_uid)
+soil_rows <- split(seq_len(nrow(tract_mupoly)), tract_mupoly$tract_uid)
 
 
-# element-wise geometry op on two equal-length sfc; st_intersection/st_difference
-# on sfc objects do all pairs, which blows up when big buffers span many tracts
-pairwise_op <- function(x, y, op) {
-  out <- mapply(function(a, b) {
-    g <- op(st_sfc(a, crs = 5070), st_sfc(b, crs = 5070))
-    # clipping can leave collections with lines/points along shared edges;
-    # keep polygons only, and an empty geometry (not a dropped row) if none
-    polys <- Filter(function(p) inherits(p, c("POLYGON", "MULTIPOLYGON")) && !st_is_empty(p),
-                    if (length(g) && inherits(g[[1]], "GEOMETRYCOLLECTION")) as.list(g[[1]]) else as.list(g))
-    if (length(polys) == 0) st_multipolygon() else st_cast(st_union(st_sfc(polys)), "MULTIPOLYGON")[[1]]
-  }, x, y, SIMPLIFY = FALSE)
-  st_sfc(out, crs = 5070)
+# setback rings of one tract, one (multi)polygon per field soil: the part of
+# each soil within its setback distance of a wetland, less the wetlands.
+# le_t has the tract's wet_mukey, mukey (field soil) and buffer_ft.
+tract_buffer_rings <- function(uid, le_t) {
+  wet_t  <- nwi_tract_soil[wet_rows[[as.character(uid)]], ]
+  soil_t <- tract_mupoly[soil_rows[[as.character(uid)]], ]
+
+  # one buffer per wetland soil x distance; field soils often share a distance
+  bufs <- unique(le_t[, .(wet_mukey, buffer_ft)])
+  bufs[, buf_id := .I]
+  buf_geom <- st_buffer(st_geometry(wet_t)[match(bufs$wet_mukey, wet_t$wet_mukey)],
+                        dist = bufs$buffer_ft * 0.3048)
+  le_t <- merge(le_t, bufs, by = c("wet_mukey", "buffer_ft"))
+
+  # field soils reached by the same set of buffers are clipped together
+  reach <- le_t[, .(buf_ids = paste(sort(buf_id), collapse = " "), buffer_ft = max(buffer_ft)), by = mukey]
+  rings <- lapply(split(reach, by = "buf_ids"), function(r) {
+    ids <- as.integer(strsplit(r$buf_ids[1], " ")[[1]])
+    st_intersection(soil_t[soil_t$mukey %in% r$mukey, ],
+                    if (length(ids) > 1) st_union(buf_geom[ids]) else buf_geom[ids])
+  })
+  rings <- do.call(rbind, rings)
+  st_agr(rings) <- "constant"
+  rings <- st_difference(rings, st_geometry(nwi_tract)[match(uid, nwi_tract$tract_uid)])
+
+  # clipping can leave lines/points along shared edges; keep polygons only
+  rings <- rings[st_dimension(rings) %in% 2, ]
+  if (nrow(rings) == 0) return(NULL)
+  if (any(st_is(rings, "GEOMETRYCOLLECTION"))) rings <- st_collection_extract(rings, "POLYGON")
+  rings <- st_cast(rings, "MULTIPOLYGON", warn = FALSE)
+
+  # with wetlands of several soil types in a tract, a field soil's buffer_ft is its largest setback
+  rings$buffer_ft <- reach$buffer_ft[match(rings$mukey, reach$mukey)]
+  rings
 }
 
 
 # wetland and setback buffer polygons for each tract, buffer clipped to the tract;
-# le_var is any LE_* column in ease_buffers (setback distance in feet)
+# le_var is any LE_* column in ease_buffers (setback distance in feet).
+# Tracts where no soil pair has an LE are dropped, wetlands included.
 get_wetland_buffers <- function(le_var) {
 
-  wet <- merge(nwi_tract,
-               ease_buffers[, .(tract_uid, buffer_ft = get(le_var))],
-               by = "tract_uid")
-  wet <- wet[!is.na(wet$buffer_ft), ]
+  # every wetland soil x field soil pair in each tract, with its county's distance
+  le <- merge(as.data.table(st_drop_geometry(nwi_tract_soil)),
+              as.data.table(st_drop_geometry(tract_mupoly))[, .(tract_uid, county_fips, mukey)],
+              by = "tract_uid", allow.cartesian = TRUE)
+  le <- merge(le, ease_buffers[, .(county_fips, wet_mukey, mukey, buffer_ft = get(le_var))],
+              by = c("county_fips", "wet_mukey", "mukey"))
+  le <- split(le[!is.na(buffer_ft)], by = "tract_uid")
 
-  tract_geom <- st_geometry(fws_tracts_nd)[match(wet$tract_uid, fws_tracts_nd$tract_uid)]
+  # rbindlist, since rbind on thousands of sf objects is very slow; the geometry
+  # comes back as a plain list column and is rebuilt as an sfc below
+  rings <- lapply(names(le), function(uid) tract_buffer_rings(as.integer(uid), le[[uid]])) |>
+    rbindlist()
 
-  # wetland + setback, kept within the easement tract
-  wet_buf <- st_buffer(st_geometry(wet), dist = wet$buffer_ft * 0.3048) |>
-    pairwise_op(tract_geom, st_intersection)
-
-  # setback ring only (buffer area outside the wetland)
-  buf_ring <- pairwise_op(wet_buf, st_geometry(wet), st_difference)
+  wet <- nwi_tract[nwi_tract$tract_uid %in% as.integer(names(le)), ]
 
   out <- rbind(
-    st_sf(tract_uid = wet$tract_uid, zone = "wetland", geometry = st_geometry(wet)),
-    st_sf(tract_uid = wet$tract_uid, zone = "buffer",  geometry = buf_ring)
+    st_sf(tract_uid = wet$tract_uid, zone = "wetland", mukey = NA_integer_, musym = NA_character_,
+          buffer_ft = NA_real_, geometry = st_geometry(wet)),
+    st_sf(tract_uid = rings$tract_uid, zone = "buffer", mukey = rings$mukey, musym = rings$musym,
+          buffer_ft = rings$buffer_ft, geometry = st_sfc(rings$geometry, crs = 5070))
   )
-  out <- out[!st_is_empty(out), ]
 
-  out$TRACTNO   <- fws_tracts_nd$TRACTNO[match(out$tract_uid, fws_tracts_nd$tract_uid)]
-  out$le_var    <- le_var
-  out$buffer_ft <- wet$buffer_ft[match(out$tract_uid, wet$tract_uid)]
-  out$acres     <- as.numeric(st_area(out)) / 4046.8564224
+  out$TRACTNO <- fws_tracts_nd$TRACTNO[match(out$tract_uid, fws_tracts_nd$tract_uid)]
+  out$le_var  <- le_var
+  out$acres   <- as.numeric(st_area(out)) / 4046.8564224
 
-  out <- out[order(out$tract_uid, out$zone != "wetland"),
-             c("tract_uid", "TRACTNO", "zone", "le_var", "buffer_ft", "acres")]
+  out <- out[order(out$tract_uid, out$zone != "wetland", out$mukey),
+             c("tract_uid", "TRACTNO", "zone", "le_var", "mukey", "musym", "buffer_ft", "acres")]
   out
 }
 
@@ -104,12 +158,16 @@ nwi_buffers <- get_wetland_buffers("LE_2ft_3in_1p2in_ft")
 saveRDS(nwi_buffers, "data/processed/nwi_buffers_LE_2ft_3in_1p2in_ft_nd.rds")
 
 
-# per-tract acreage: wetland + setback buffer together is the protected area
+# per-tract acreage: wetland + setback buffer together is the protected area;
+# buffer_ft_min/max are the range of setback distances over the tract's field
+# soils (NA if no setback falls inside the tract)
 tract_buffer_acres <- function(buffers) {
-  d <- dcast(as.data.table(st_drop_geometry(buffers)),
-             tract_uid + TRACTNO + le_var + buffer_ft ~ zone,
-             value.var = "acres", fill = 0)
-  setnames(d, c("wetland", "buffer"), c("wet_acres", "buffer_acres"))
+  d <- as.data.table(st_drop_geometry(buffers))[, .(
+    wet_acres     = sum(acres[zone == "wetland"]),
+    buffer_acres  = sum(acres[zone == "buffer"]),
+    buffer_ft_min = if (any(zone == "buffer")) min(buffer_ft, na.rm = TRUE) else NA_real_,
+    buffer_ft_max = if (any(zone == "buffer")) max(buffer_ft, na.rm = TRUE) else NA_real_
+  ), by = .(tract_uid, TRACTNO, le_var)]
   d[, wet_buf_acres := wet_acres + buffer_acres]
   d[, tract_acres := as.numeric(st_area(fws_tracts_nd))[tract_uid] / 4046.8564224]
   d[, wet_buf_share := wet_buf_acres / tract_acres]
@@ -128,11 +186,11 @@ union_wet_buf <- function(buffers) {
     st_as_sf()
   u <- st_cast(u[, "tract_uid"], "MULTIPOLYGON", warn = FALSE)
 
-  attrs <- unique(st_drop_geometry(buffers)[, c("tract_uid", "TRACTNO", "le_var", "buffer_ft")])
+  attrs <- unique(st_drop_geometry(buffers)[, c("tract_uid", "TRACTNO", "le_var")])
   u <- merge(u, attrs, by = "tract_uid")
   u$acres <- as.numeric(st_area(u)) / 4046.8564224
 
-  u[order(u$tract_uid), c("tract_uid", "TRACTNO", "le_var", "buffer_ft", "acres")]
+  u[order(u$tract_uid), c("tract_uid", "TRACTNO", "le_var", "acres")]
 }
 
 nwi_wet_buf <- union_wet_buf(nwi_buffers)
@@ -206,13 +264,15 @@ ex_data <- lapply(ex_uids, function(uid) {
 
   # shares of the tract; FWS and NRCS setback rings measured separately
   pct <- function(x) 100 * x / ac$tract_acres
+  # setback distance, or its range over the tract's field soils
+  ft <- function(a) paste(unique(c(a$buffer_ft_min, a$buffer_ft_max)), collapse = "-")
   subtitle <- sprintf(paste0("Wetland %.0f%%\n",
                              "FWS setback %s ft: %.0f%%\n",
                              "NRCS setback %s ft: %.0f%%\n",
                              "Cropped: %.0f%% of wetland + FWS setback"),
                       pct(ac$wet_acres),
-                      ac$buffer_ft, pct(ac$buffer_acres),
-                      ac_nrcs$buffer_ft, pct(ac_nrcs$buffer_acres),
+                      ft(ac), pct(ac$buffer_acres),
+                      ft(ac_nrcs), pct(ac_nrcs$buffer_acres),
                       crop_pct)
 
   list(tract = tract,

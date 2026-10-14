@@ -6,17 +6,23 @@
 #      data/raw/gSSURGO_ND.gdb
 # Out: data/processed/gssurgo_tract_mukey_nd.rds, gssurgo_tract_soils_nd.rds,
 #      gssurgo_tract_lcc_nd.rds
-#      data/processed/gssurgo_tract_dom_soils_nd.csv   dominant field and wetland
-#        map units per tract; the input to the external lateral effect
-#        calculation that produces LateralEffect_Tract_LE.csv (see 00_master.R)
+#      data/processed/nwi_basin_soils_nd.rds        dominant map unit of each wetland
+#                                                   basin (used by step 05)
+#      data/processed/gssurgo_tract_mupoly_nd.rds   map unit polygons clipped to
+#                                                   tracts (used by step 05)
+#      data/processed/gssurgo_soil_pairs_nd.csv   every county x wetland soil x
+#        field soil that occurs together in a tract; the input to the external
+#        lateral effect calculation that produces LateralEffect_Soils_LE.csv
+#        (see 00_master.R)
 #      figures/stutsman_easement_hydric.pdf  (not used in the memo)
 #
-# MEMO: "Drain Tile Setbacks" section: the dominant field and wetland soil types
-#       used to compute each tract's setback come from the CSV written here.
-#       The setback distances themselves (tables/setback_county.tex, the 160 ft
-#       vs 70 ft medians, the 32% vs 1.4% of tracts over 500 ft, the ~300 tracts
-#       with missing soil data) come from LateralEffect_Tract_LE.csv, and no
-#       script in this repo builds that table or those numbers.
+# MEMO: "Drain Tile Setbacks" section: the field and wetland soil types used to
+#       compute setbacks come from the CSV written here. The memo's setback
+#       distances (tables/setback_county.tex, the 160 ft vs 70 ft medians, the
+#       32% vs 1.4% of tracts over 500 ft, the ~300 tracts with missing soil
+#       data) were computed from the earlier one-row-per-tract version of that
+#       CSV (dominant field and wetland soil only), and no script in this repo
+#       builds that table or those numbers.
 
 rm(list = ls())
 gc()
@@ -134,11 +140,80 @@ saveRDS(tract_soils, "data/processed/gssurgo_tract_soils_nd.rds")
 saveRDS(tract_lcc,   "data/processed/gssurgo_tract_lcc_nd.rds")
 
 
-# input to the external lateral effect (setback) calculation
-write.csv(tract_soils[, .(tract_uid, county_fips, county_name, dom_mukey, dom_mu_acres, dom_musym, dom_muname,
-                          wet_acres, wet_dom_mukey, wet_dom_mu_acres, wet_dom_musym, wet_dom_muname,
-                          nonwet_acres, nonwet_dom_mukey, nonwet_dom_mu_acres, nonwet_dom_musym, nonwet_dom_muname)],
-          "data/processed/gssurgo_tract_dom_soils_nd.csv", row.names = FALSE)
+# wetland basins: a basin is one NWI polygon within one tract (a row of nwi_ease).
+# Each basin gets the map unit covering most of its cells.
+nwi_ease$basin_uid <- seq_len(nrow(nwi_ease))   # row id; matches step 05
+
+basin_r  <- rasterize(vect(nwi_ease[, "basin_uid"]), mu_r, field = "basin_uid")
+basin_mu <- crosstab(c(basin_r, mu_r), long = TRUE, useNA = FALSE) |> as.data.table()
+setnames(basin_mu, c("basin_uid", "mukey", "n_pix"))
+basin_soils <- basin_mu[basin_mu[, .I[which.max(n_pix)], by = basin_uid]$V1, .(basin_uid, mukey = as.integer(mukey))]
+
+# basins too small to hold a cell center get the map unit at a point inside them
+small_uid <- setdiff(nwi_ease$basin_uid, basin_soils$basin_uid)
+small_pts <- st_point_on_surface(st_geometry(nwi_ease)[small_uid])
+basin_soils <- rbind(basin_soils,
+                     data.table(basin_uid = small_uid, mukey = as.integer(extract(mu_r, vect(small_pts))[, 2])))
+
+basin_soils <- merge(as.data.table(st_drop_geometry(nwi_ease))[, .(basin_uid, tract_uid, NWI_ID, wet_acres)],
+                     basin_soils, by = "basin_uid", all.x = TRUE)
+setnames(basin_soils, "mukey", "wet_mukey")
+
+saveRDS(basin_soils, "data/processed/nwi_basin_soils_nd.rds")
+
+
+# map unit polygons clipped to tracts, one (multi)polygon per tract x map unit;
+# step 05 clips each soil's setback to these
+mupoly <- read_sf(gssurgo_gdb, query = "SELECT MUKEY FROM MUPOLYGON") |>
+  st_set_geometry("geometry") |>
+  st_transform(5070)
+mupoly$mukey <- as.integer(mupoly$MUKEY)
+
+mupoly <- st_filter(mupoly[, "mukey"], fws_tracts_nd) |>
+  st_make_valid()
+
+# shared edges can come back as lines/points, so keep polygons only
+tract_mupoly <- st_intersection(mupoly, fws_tracts_nd[, "tract_uid"]) |>
+  st_collection_extract("POLYGON")
+
+tract_mupoly <- aggregate(vect(tract_mupoly), by = c("tract_uid", "mukey")) |>
+  st_as_sf()
+tract_mupoly <- st_cast(tract_mupoly[, c("tract_uid", "mukey")], "MULTIPOLYGON", warn = FALSE)
+tract_mupoly <- merge(tract_mupoly, mapunit[, .(mukey, musym)], by = "mukey", all.x = TRUE)
+# the tract's county, which step 05 needs to look up setback distances
+tract_mupoly$county_fips <- tract_cnty$county_fips[match(tract_mupoly$tract_uid, tract_cnty$tract_uid)]
+tract_mupoly <- tract_mupoly[order(tract_mupoly$tract_uid, tract_mupoly$mukey),
+                             c("tract_uid", "county_fips", "mukey", "musym")]
+
+saveRDS(tract_mupoly, "data/processed/gssurgo_tract_mupoly_nd.rds")
+
+
+# input to the external lateral effect (setback) calculation: one row per
+# county x wetland soil x field soil that occurs together in a tract. The wetland
+# soils are the basins' dominant map units; the field soils are every map unit
+# polygon in the tract, so each piece step 05 buffers has a distance.
+# Column names follow the earlier one-row-per-tract file. There the calculator's
+# distances tracked dom_mukey (the tract's dominant soil, wetland or not) rather
+# than nonwet_dom_mukey, so the field soil is written to both sets of columns.
+tract_wet_soils   <- unique(basin_soils[!is.na(wet_mukey), .(tract_uid, wet_dom_mukey = wet_mukey)])
+tract_field_soils <- as.data.table(st_drop_geometry(tract_mupoly))[, .(tract_uid, nonwet_dom_mukey = mukey)]
+
+soil_pairs <- merge(tract_wet_soils, tract_field_soils, by = "tract_uid", allow.cartesian = TRUE)
+soil_pairs <- merge(soil_pairs, tract_cnty, by = "tract_uid")
+soil_pairs <- unique(soil_pairs[, .(county_fips, county_name, wet_dom_mukey, nonwet_dom_mukey)])
+
+mu_names <- mapunit[, .(mukey, musym, muname)]
+soil_pairs <- merge(soil_pairs, setNames(mu_names, c("wet_dom_mukey", "wet_dom_musym", "wet_dom_muname")),
+                    by = "wet_dom_mukey", all.x = TRUE)
+soil_pairs <- merge(soil_pairs, setNames(mu_names, c("nonwet_dom_mukey", "nonwet_dom_musym", "nonwet_dom_muname")),
+                    by = "nonwet_dom_mukey", all.x = TRUE)
+soil_pairs[, `:=`(dom_mukey = nonwet_dom_mukey, dom_musym = nonwet_dom_musym, dom_muname = nonwet_dom_muname)]
+setorder(soil_pairs, county_fips, wet_dom_mukey, nonwet_dom_mukey)
+
+write.csv(soil_pairs[, .(county_fips, county_name, dom_mukey, dom_musym, dom_muname,
+                         wet_dom_mukey, wet_dom_musym, wet_dom_muname,
+                         nonwet_dom_mukey, nonwet_dom_musym, nonwet_dom_muname)],
+          "data/processed/gssurgo_soil_pairs_nd.csv", row.names = FALSE)
 
 
 
