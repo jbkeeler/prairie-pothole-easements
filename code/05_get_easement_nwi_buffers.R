@@ -180,11 +180,23 @@ nwi_buffer_acres <- tract_buffer_acres(nwi_buffers)
 fwrite(nwi_buffer_acres, "data/processed/nwi_buffer_acres_LE_2ft_3in_1p2in_ft_nd.csv")
 
 
+# neighbouring rings are clipped from different buffers, so their shared edges
+# don't match exactly; their union keeps zero-area cracks and slivers that plot
+# as stray lines. A 1 cm closing (grow, then shrink) seals them; mitre joins
+# keep the vertex count and the area change is effectively zero.
+close_cracks <- function(g, eps = 0.01) {
+  g |>
+    st_buffer(eps,  joinStyle = "MITRE", mitreLimit = 2) |>
+    st_buffer(-eps, joinStyle = "MITRE", mitreLimit = 2)
+}
+
 # combined wetland + setback buffer, one polygon per tract
 union_wet_buf <- function(buffers) {
   u <- aggregate(vect(buffers[, "tract_uid"]), by = "tract_uid") |>
     st_as_sf()
   u <- st_cast(u[, "tract_uid"], "MULTIPOLYGON", warn = FALSE)
+  st_agr(u) <- "constant"
+  u <- st_cast(close_cracks(u), "MULTIPOLYGON", warn = FALSE)
 
   attrs <- unique(st_drop_geometry(buffers)[, c("tract_uid", "TRACTNO", "le_var")])
   u <- merge(u, attrs, by = "tract_uid")
@@ -241,9 +253,9 @@ ex_data <- lapply(ex_uids, function(uid) {
   # wetland + setback outline for each standard
   setbacks <- rbind(
     st_sf(standard = "FWS setback",
-          geometry = st_union(nwi_buffers[nwi_buffers$tract_uid == uid, ])),
+          geometry = close_cracks(st_union(nwi_buffers[nwi_buffers$tract_uid == uid, ]))),
     st_sf(standard = "NRCS setback",
-          geometry = st_union(nrcs_buffers[nrcs_buffers$tract_uid == uid, ]))
+          geometry = close_cracks(st_union(nrcs_buffers[nrcs_buffers$tract_uid == uid, ])))
   )
   setbacks$standard <- factor(setbacks$standard, levels = setback_levels)
 
